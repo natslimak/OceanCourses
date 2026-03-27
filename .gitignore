@@ -30,3 +30,7 @@ build/
 .DS_Store
 Thumbs.db
 DigitalOcean/Assignment_2/Data/cmems_arctic_2015-2016.nc
+DigitalOcean/Project/Data/atl_sst_mhw_2016.nc
+DigitalOcean/Project/Data/atl_sst_mhw_2023.nc
+DigitalOcean/Project/Data/era5_tcc_mhw_2016.nc
+DigitalOcean/Project/Data/era5_tcc_mhw_2023.nc
