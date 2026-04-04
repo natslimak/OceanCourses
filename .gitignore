@@ -34,3 +34,7 @@ DigitalOcean/Project/Data/atl_sst_mhw_2016.nc
 DigitalOcean/Project/Data/atl_sst_mhw_2023.nc
 DigitalOcean/Project/Data/era5_tcc_mhw_2016.nc
 DigitalOcean/Project/Data/era5_tcc_mhw_2023.nc
+DigitalOcean/Project/Data/era5_u-wind_mhw_2016.nc
+DigitalOcean/Project/Data/era5_u-wind_mhw_2023.nc
+DigitalOcean/Project/Data/era5_v-wind_mhw_2023.nc
+DigitalOcean/Project/Data/era5_v-wind_mhw_2016.nc
