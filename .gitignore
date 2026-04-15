@@ -101,3 +101,8 @@ DigitalOcean/Project/OldData/era5_u-wind_mhw_2016.nc
 DigitalOcean/Project/OldData/era5_u-wind_mhw_2023.nc
 DigitalOcean/Project/OldData/era5_v-wind_mhw_2016.nc
 DigitalOcean/Project/OldData/era5_v-wind_mhw_2023.nc
+DigitalOcean/Project/Data/mhw2016JFM_tcc_2013.nc
+DigitalOcean/Project/Data/mhw2023JJA_sst_2018.nc
+DigitalOcean/Project/Data/mhw2023JJA_tcc_2018.nc
+DigitalOcean/Project/Data/mhw2023JJA_uwind_2018.nc
+DigitalOcean/Project/Data/mhw2023JJA_vwind_2018.nc
