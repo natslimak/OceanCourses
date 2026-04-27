@@ -7,11 +7,14 @@ import logging
 # ── User settings ───────────────────────────────────────────────────────────
 
 AGG_FUNC = 'mean'  # 'mean' or 'std'
-ANOMALY_YEAR = 2023
 
-FILE_CORE_NAME = "mhw2023JJA"
+ANOMALY_YEAR = 2016
+FILE_CORE_NAME = "mhw2016JFM"
+YEARS = [2013, 2014, 2015, 2016, 2017, 2018, 2019]
 
-YEARS = [2018, 2019, 2020, 2021, 2022, 2023, 2024]
+# ANOMALY_YEAR = 2023
+# FILE_CORE_NAME = "mhw2023JJA"
+# YEARS = [2018, 2019, 2020, 2021, 2022, 2023, 2024]
 
 # ── Configuration ───────────────────────────────────────────────────────────
 DATA_DIR = "Data"
