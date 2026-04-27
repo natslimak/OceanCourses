@@ -286,28 +286,35 @@ def plot_combined_significance(results_by_measurement, base_filename):
     results_by_measurement: dict of {measurement: (lon, lat, significant_mask)}
     """
     fig, ax = plt.subplots(figsize=(14, 8))
-    
-    # Define colors for each measurement
-    colors = {
-        "sst": "red",
-        "tcc": "blue",
-        "wind_intensity": "green",
+
+    marker_styles = {
+        "sst": {"marker": "o", "color": "red", "zorder": 1},
+        "wind_intensity": {"marker": "s", "color": "green", "zorder": 2},
+        "tcc": {"marker": "^", "color": "blue", "zorder": 3},
     }
-    
-    for measurement, (lon, lat, sig_mask) in results_by_measurement.items():
+
+    draw_order = ["sst", "wind_intensity", "tcc"]
+    for measurement in draw_order:
+        if measurement not in results_by_measurement:
+            continue
+        lon, lat, sig_mask = results_by_measurement[measurement]
         lon2d, lat2d = np.meshgrid(lon, lat)
         yy, xx = np.where(sig_mask)
         if yy.size > 0:
+            style = marker_styles[measurement]
             ax.scatter(
                 lon2d[yy, xx],
                 lat2d[yy, xx],
-                s=8,
-                c=colors[measurement],
-                alpha=0.6,
-                linewidths=0,
+                s=28,
+                c=style["color"],
+                marker=style["marker"],
+                alpha=0.5,
+                edgecolors="black",
+                linewidths=0.35,
                 label=MEASUREMENT_LABELS[measurement],
+                zorder=style["zorder"],
             )
-    
+
     ax.set_xlabel("Longitude (degE)", fontsize=12)
     ax.set_ylabel("Latitude (degN)", fontsize=12)
     ax.set_title(
