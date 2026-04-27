@@ -161,6 +161,111 @@ def compute_maps_and_ttest(reference_samples, target_samples, alpha=0.05, equal_
 
 # ── Plotting ────────────────────────────────────────────────────────────────
 
+def plot_heatmap(lon, lat, data, measurement, title, save_path, label=None, cmap=CMAP_MEASURE):
+    if label is None:
+        label = f"{MEASUREMENT_LABELS[measurement]} ({MEASUREMENT_UNITS[measurement]})"
+    fig, ax = plt.subplots(figsize=(12, 7))
+    img = ax.pcolormesh(lon, lat, data, cmap=cmap, shading="auto")
+    fig.colorbar(img, ax=ax, label=label)
+    ax.set_xlabel("Longitude (degE)")
+    ax.set_ylabel("Latitude (degN)")
+    ax.set_title(title)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150)
+    plt.show()
+
+
+def _add_significance_stipple(ax, lon, lat, sig_mask):
+    lon2d, lat2d = np.meshgrid(lon, lat)
+    yy, xx = np.where(sig_mask)
+    if yy.size > 0:
+        ax.scatter(
+            lon2d[yy, xx],
+            lat2d[yy, xx],
+            s=6,
+            c="black",
+            alpha=0.95,
+            marker="o",
+            linewidths=0,
+            label=f"p <= {ALPHA}",
+        )
+
+
+def plot_baseline_vs_target_with_significance(
+    lon,
+    lat,
+    reference_mean,
+    target_mean,
+    significant_mask,
+    measurement,
+    target_year,
+    reference_years,
+    save_path,
+):
+    units = MEASUREMENT_UNITS[measurement]
+    mlabel = MEASUREMENT_LABELS[measurement]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(22, 6))
+
+    img1 = ax1.pcolormesh(lon, lat, reference_mean, cmap=CMAP_MEASURE, shading="auto")
+    fig.colorbar(img1, ax=ax1, label=f"{mlabel} ({units})")
+    ax1.set_xlabel("Longitude (degE)")
+    ax1.set_ylabel("Latitude (degN)")
+    ax1.set_title(f"Baseline Mean {mlabel} ({reference_years[0]}-{reference_years[-1]})")
+
+    img2 = ax2.pcolormesh(lon, lat, target_mean, cmap=CMAP_MEASURE, shading="auto")
+    fig.colorbar(img2, ax=ax2, label=f"{mlabel} ({units})")
+    _add_significance_stipple(ax2, lon, lat, significant_mask)
+    ax2.set_xlabel("Longitude (degE)")
+    ax2.set_ylabel("Latitude (degN)")
+    ax2.set_title(
+        f"{mlabel} Mean: {target_year} vs Baseline\n"
+        f"Stippling: statistically significant (p <= {ALPHA})"
+    )
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150)
+    plt.show()
+
+
+def plot_anomaly_with_significance(
+    lon,
+    lat,
+    anomaly,
+    significant_mask,
+    measurement,
+    target_year,
+    reference_years,
+    save_path,
+):
+    units = MEASUREMENT_UNITS[measurement]
+    mlabel = MEASUREMENT_LABELS[measurement]
+    vmax_anom = np.nanmax(np.abs(anomaly))
+
+    fig, ax = plt.subplots(figsize=(12, 7))
+    img = ax.pcolormesh(
+        lon,
+        lat,
+        anomaly,
+        cmap=CMAP_ANOMALY,
+        shading="auto",
+        vmin=-vmax_anom,
+        vmax=vmax_anom,
+    )
+    fig.colorbar(img, ax=ax, label=f"Anomaly ({units})")
+    _add_significance_stipple(ax, lon, lat, significant_mask)
+    ax.set_xlabel("Longitude (degE)")
+    ax.set_ylabel("Latitude (degN)")
+    ax.set_title(
+        f"{mlabel} Anomaly: {target_year} vs {reference_years[0]}-{reference_years[-1]}\n"
+        f"Stippling: statistically significant (p <= {ALPHA})"
+    )
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150)
+    plt.show()
+
+
 def plot_p_value_map(lon, lat, p_values, measurement, target_year, save_path):
     mlabel = MEASUREMENT_LABELS[measurement]
     fig, ax = plt.subplots(figsize=(12, 7))
@@ -173,6 +278,52 @@ def plot_p_value_map(lon, lat, p_values, measurement, target_year, save_path):
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
     plt.show()
+
+
+def plot_combined_significance(results_by_measurement, base_filename):
+    """
+    Plot all significant grid points from all measurements on a single map.
+    results_by_measurement: dict of {measurement: (lon, lat, significant_mask)}
+    """
+    fig, ax = plt.subplots(figsize=(14, 8))
+    
+    # Define colors for each measurement
+    colors = {
+        "sst": "red",
+        "tcc": "blue",
+        "wind_intensity": "green",
+    }
+    
+    for measurement, (lon, lat, sig_mask) in results_by_measurement.items():
+        lon2d, lat2d = np.meshgrid(lon, lat)
+        yy, xx = np.where(sig_mask)
+        if yy.size > 0:
+            ax.scatter(
+                lon2d[yy, xx],
+                lat2d[yy, xx],
+                s=8,
+                c=colors[measurement],
+                alpha=0.6,
+                linewidths=0,
+                label=MEASUREMENT_LABELS[measurement],
+            )
+    
+    ax.set_xlabel("Longitude (degE)", fontsize=12)
+    ax.set_ylabel("Latitude (degN)", fontsize=12)
+    ax.set_title(
+        f"Combined Significance Map: All Variables (p <= {ALPHA})\n"
+        f"Target Year: {ANOMALY_YEAR}",
+        fontsize=14,
+        fontweight="bold"
+    )
+    ax.legend(loc="upper left", fontsize=10, markerscale=2)
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    save_path = f"{RESULTS_DIR}/{FILE_CORE_NAME}_combined_significance_map_{ANOMALY_YEAR}.png"
+    plt.savefig(save_path, dpi=150)
+    plt.show()
+    logging.warning(f"Combined significance map saved to {save_path}")
 
 
 def main(base_filename, measurement):
@@ -212,6 +363,29 @@ def main(base_filename, measurement):
         ALPHA,
     )
 
+    plot_baseline_vs_target_with_significance(
+        lon,
+        lat,
+        reference_mean,
+        target_mean,
+        significant_mask,
+        measurement,
+        ANOMALY_YEAR,
+        reference_years,
+        f"{RESULTS_DIR}/{FILE_CORE_NAME}_{measurement}_baseline_vs_target_{ANOMALY_YEAR}.png",
+    )
+
+    plot_anomaly_with_significance(
+        lon,
+        lat,
+        anomaly,
+        significant_mask,
+        measurement,
+        ANOMALY_YEAR,
+        reference_years,
+        f"{RESULTS_DIR}/{FILE_CORE_NAME}_{measurement}_anomaly_significance_{ANOMALY_YEAR}.png",
+    )
+
     plot_p_value_map(
         lon,
         lat,
@@ -221,9 +395,19 @@ def main(base_filename, measurement):
         f"{RESULTS_DIR}/{FILE_CORE_NAME}_{measurement}_pvalues_{ANOMALY_YEAR}.png",
     )
 
+    return (lon, lat, significant_mask)
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s")
     fname = f"{DATA_DIR}/{FILE_CORE_NAME}"
+    
+    # Store results for combined plot
+    results_by_measurement = {}
+    
     for measurement_name in AVAILABLE_MEASUREMENTS:
-        main(fname, measurement_name)
+        lon, lat, sig_mask = main(fname, measurement_name)
+        results_by_measurement[measurement_name] = (lon, lat, sig_mask)
+    
+    # Create combined significance map
+    plot_combined_significance(results_by_measurement, fname)
