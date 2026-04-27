@@ -5,11 +5,17 @@ import logging
 
 
 # ── User settings ───────────────────────────────────────────────────────────
+# These settings control which data to analyze and how to aggregate it
 
-AGG_FUNC = 'mean'  # 'mean' or 'std'
+AGG_FUNC = 'mean'  # Choose 'mean' or 'std' to aggregate daily samples into single maps
 
+# The target year to compare against the baseline (reference years)
 ANOMALY_YEAR = 2016
+
+# File naming prefix - matches the data file naming convention
 FILE_CORE_NAME = "mhw2016JFM"
+
+# All years in the dataset. ANOMALY_YEAR will be compared against the other years.
 YEARS = [2013, 2014, 2015, 2016, 2017, 2018, 2019]
 
 # ANOMALY_YEAR = 2023
@@ -17,46 +23,66 @@ YEARS = [2013, 2014, 2015, 2016, 2017, 2018, 2019]
 # YEARS = [2018, 2019, 2020, 2021, 2022, 2023, 2024]
 
 # ── Configuration ───────────────────────────────────────────────────────────
+# Data source and output settings, plus measurement-specific metadata
+
+# Where the input NetCDF files are located (relative path)
 DATA_DIR = "Data"
+
+# Where to save the output plots
 RESULTS_DIR = "Results"
+
+# List of variables to analyze (wind, sea surface temperature, total cloud cover)
 AVALIABLE_MEASUREMENTS = ['wind_intensity', 'sst', 'tcc'] 
 
-#for each measurements diferent var is used
+# NetCDF variable names for each measurement type
+# Wind intensity is computed from u100 and v100, so it's not listed here
 MEASUREMENT_VARIABLES = { 'sst': 'analysed_sst',
                           'tcc': 'tcc'}
 
-# SST uses 'time', others use 'time' + 'valid_time'
+# Dimension names in each NetCDF file that we stack together to get samples
+# SST files have only 'time'; wind and cloud files have both 'time' and 'valid_time'
 MEASUREMENT_TIME_DIMS = { 'sst': ['time'],
                           'tcc': ['time', 'valid_time'],
                           'wind_intensity': ['time', 'valid_time']}
 
+# Units for display on plot labels
 MEASUREMENT_UNITS = { 'sst': '°C',
                       'tcc': '(0–1)',
                       'wind_intensity': 'm/s'}
 
+# Human-readable labels for each variable
 MEASUREMENT_LABELS = { 'sst': 'Sea Surface Temperature',
                        'tcc': 'Total Cloud Cover',
                        'wind_intensity': 'Wind Intensity'}
 
-CELCIUS_OFFSET = 273.15
+CELCIUS_OFFSET = 273.15  # Convert Kelvin to Celsius by subtracting this value
 
-CMAP_MEASURE= 'viridis'
+CMAP_MEASURE = 'viridis'  # Colormap for mean/standard deviation plots
 
-CMAP_STD = 'magma'
+CMAP_STD = 'magma'  # Colormap for standard deviation (when AGG_FUNC = 'std')
 
-CMAP_ANOMALY = 'RdBu_r'
+CMAP_ANOMALY = 'RdBu_r'  # Colormap for anomalies (red-blue, diverging)
 
-AGG_LABELS = { 'mean': 'Daily Mean', 'std': 'Daily Std Dev' }
+AGG_LABELS = { 'mean': 'Daily Mean', 'std': 'Daily Std Dev' }  # Labels for plot titles
 
 # ── Data operations ───────────────────────────────────────────────────────────
+# Functions to load and compute derived quantities from the raw data
 
 def load_data(filename, measurement, year):
+    """
+    Load a single NetCDF file for a given measurement and year.
+    Returns an xarray Dataset with all variables and dimensions from the file.
+    """
     logging.info(f"Loading data for year {year} from file {filename}_{year}.nc")
     ds = xr.open_dataset(f"{filename}_{measurement}_{year}.nc")
     return ds
 
 
 def get_variable_name(measurement):
+    """
+    Return the NetCDF variable name for a given measurement type.
+    Raises an error if the measurement is unknown.
+    """
     var_name = MEASUREMENT_VARIABLES.get(measurement)
     if var_name is None:
         raise ValueError(f"Unknown measurement '{measurement}'. Valid options: {list(MEASUREMENT_VARIABLES.keys())}")
@@ -64,7 +90,12 @@ def get_variable_name(measurement):
 
 
 def _load_wind_intensity(filename, year, agg='mean'):
-    """Load uwind and vwind files and compute sqrt(u^2 + v^2)."""
+    """
+    Load u-wind (u100) and v-wind (v100) components, then compute wind speed magnitude.
+    Wind speed = sqrt(u^2 + v^2)
+    agg controls aggregation: 'mean' computes time-averaged speed, 'std' computes time-std
+    Returns: (longitude, latitude, wind_speed_array)
+    """
     ds_u = xr.open_dataset(f"{filename}_uwind_{year}.nc")
     ds_v = xr.open_dataset(f"{filename}_vwind_{year}.nc")
     time_dims = MEASUREMENT_TIME_DIMS['wind_intensity']
@@ -79,7 +110,12 @@ def _load_wind_intensity(filename, year, agg='mean'):
 
 
 def compute_avg(filename, measurement, year):
-    """Return (lon, lat, mean_value) for a single year."""
+    """
+    Compute the daily mean for a single measurement and year.
+    For wind, this averages the magnitude after computation.
+    For SST, converts from Kelvin to Celsius.
+    Returns: (longitude, latitude, 2D mean array [lat, lon])
+    """
     if measurement == 'wind_intensity':
         return _load_wind_intensity(filename, year, agg='mean')
     ds = load_data(filename, measurement, year)
@@ -95,7 +131,11 @@ def compute_avg(filename, measurement, year):
     return lon, lat, avg_var
 
 def compute_std(filename, measurement, year):
-    """Return (lon, lat, std_value) for a single year."""
+    """
+    Compute the daily standard deviation for a single measurement and year.
+    Similar to compute_avg but returns time-std instead of time-mean.
+    Returns: (longitude, latitude, 2D std array [lat, lon])
+    """
     if measurement == 'wind_intensity':
         return _load_wind_intensity(filename, year, agg='std')
     ds = load_data(filename, measurement, year)
@@ -110,14 +150,21 @@ def compute_std(filename, measurement, year):
    
 
 def _compute_year(filename, measurement, year, agg_func):
-    """Dispatch to compute_avg or compute_std."""
+    """
+    Helper function that calls either compute_avg or compute_std based on AGG_FUNC.
+    This centralizes the decision logic for aggregation method.
+    """
     if agg_func == 'mean':
         return compute_avg(filename, measurement, year)
     return compute_std(filename, measurement, year)
 
 
 def compute_baseline(filename, measurement, years):
-    """Return (lon, lat, baseline) averaged across all years."""
+    """
+    Compute the baseline (reference) map by averaging across all input years.
+    This is typically used to compare a single anomaly year against a multi-year baseline.
+    Returns: (longitude, latitude, 2D baseline array [lat, lon])
+    """
     all_yearly = []
     lon = lat = None
     for year in years:
@@ -131,13 +178,24 @@ def compute_baseline(filename, measurement, years):
 
 
 def compute_anomaly(filename, measurement, year, baseline):
-    """Return anomaly (year_mean - baseline)."""
+    """
+    Compute the anomaly for a single year relative to a baseline map.
+    Anomaly = year_mean - baseline
+    Positive values indicate the year is warmer/higher than the long-term average.
+    Returns: 2D anomaly array [lat, lon]
+    """
     _, _, year_avg = compute_avg(filename, measurement, year)
     return year_avg - baseline
 
 # ── Plotting ──────────────────────────────────────────────────────────────────
+# Functions to create and save publication-quality visualizations
 
 def plot_heatmap(lon, lat, data, measurement, title, save_path, label=None):
+    """
+    Create a single-panel heatmap (pcolormesh) for a 2D data field.
+    Automatically applies the appropriate colormap based on aggregation method.
+    Saves the figure and displays it on screen.
+    """
     if label is None:
         label = f'{AGG_LABELS[AGG_FUNC]} {MEASUREMENT_LABELS[measurement]} ({MEASUREMENT_UNITS[measurement]})'
     cmap = CMAP_STD if AGG_FUNC == 'std' else CMAP_MEASURE
@@ -153,6 +211,10 @@ def plot_heatmap(lon, lat, data, measurement, title, save_path, label=None):
 
 
 def plot_anomaly_heatmap(lon, lat, anomaly, measurement, title, save_path):
+    """
+    Create a single-panel heatmap for anomaly data using a diverging colormap.
+    Anomalies are centered at zero, with symmetric color limits.
+    """
     label = f'{MEASUREMENT_LABELS[measurement]} Anomaly ({MEASUREMENT_UNITS[measurement]})'
     vmax = np.nanmax(np.abs(anomaly))
     fig, ax = plt.subplots(figsize=(10, 4))
@@ -168,7 +230,12 @@ def plot_anomaly_heatmap(lon, lat, anomaly, measurement, title, save_path):
 
 
 def plot_year_vs_anomaly(lon, lat, year_avg, anomaly, measurement, year, save_path):
-    """Side-by-side: year average (left) and anomaly vs baseline (right)."""
+    """
+    Create a side-by-side comparison figure showing:
+    - LEFT: the target year's mean values
+    - RIGHT: the anomaly (difference from baseline) for that year
+    This makes it easy to see both the absolute values and their deviations.
+    """
     units = MEASUREMENT_UNITS[measurement]
     mlabel = MEASUREMENT_LABELS[measurement]
     vmax_anom = np.nanmax(np.abs(anomaly))
@@ -195,6 +262,13 @@ def plot_year_vs_anomaly(lon, lat, year_avg, anomaly, measurement, year, save_pa
 
 
 def main(fname, m, label):
+    """
+    Main workflow for a single measurement type:
+    1. Compute baseline (average across all reference years)
+    2. Compute target year average
+    3. Compute anomaly (target - baseline)
+    4. Create and save visualizations
+    """
     agg = AGG_FUNC
     # Baseline across all years
     lon, lat, baseline = compute_baseline(fname, m, YEARS)
@@ -210,6 +284,9 @@ def main(fname, m, label):
                         
 
 if __name__ == "__main__":
+    """
+    Main execution block: loops through all measurements and creates analysis plots.
+    """
     logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
     fname = f"{DATA_DIR}/{FILE_CORE_NAME}"
     for m in AVALIABLE_MEASUREMENTS:

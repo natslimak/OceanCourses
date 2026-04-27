@@ -16,9 +16,31 @@ from annomalities import (
 	load_data,
 )
 
+# ───────────────────────────────────────────────────────────────────────────────
+# Data Verification Utility
+# ───────────────────────────────────────────────────────────────────────────────
+# This script validates SST (Sea Surface Temperature) data by comparing the
+# distribution of values in the anomaly year against the baseline climatology
+# (mean across reference years). Useful for:
+# - Confirming data was loaded correctly
+# - Visualizing how anomalous the target year is
+# - Detecting data quality issues or outliers
+# ───────────────────────────────────────────────────────────────────────────────
+
 
 def _to_celsius_if_needed(values):
-	"""Convert Kelvin to Celsius using a simple threshold check."""
+	"""Convert temperature from Kelvin to Celsius if values appear to be in Kelvin.
+	
+	Uses a simple heuristic: if the mean value is > 100, assumes the data is in Kelvin
+	(since absolute temperature is always > 273) and subtracts the offset. Otherwise
+	assuumes data is already in Celsius and returns unchanged.
+	
+	Args:
+		values (ndarray): Temperature values to potentially convert
+	
+	Returns:
+		ndarray: Temperature values in Celsius
+	"""
 	mean_val = float(np.nanmean(values))
 	if mean_val > 100.0:
 		return values - CELCIUS_OFFSET
@@ -26,7 +48,18 @@ def _to_celsius_if_needed(values):
 
 
 def _year_mean_field_sst(filename_core, year):
-	"""Return the 3-month SST mean map for one year."""
+	"""Load SST data and compute the 3-month mean spatial field for one year.
+	
+	Loads the NetCDF file for SST in the specified year, averages across all time
+	dimensions (e.g., all days in the 3-month window), and converts to Celsius if needed.
+	
+	Args:
+		filename_core (str): Base filename without extension or year
+		year (int): Year to load
+	
+	Returns:
+		ndarray: Mean SST field for the year [latitude, longitude] in degrees Celsius
+	"""
 	ds = load_data(filename_core, "sst", year)
 	var_name = get_variable_name("sst")
 	da = ds[var_name]
@@ -39,13 +72,35 @@ def _year_mean_field_sst(filename_core, year):
 
 
 def _flatten_valid(arr):
-	"""Flatten to 1D and drop NaNs."""
+	"""Flatten a multi-dimensional array and remove NaN values.
+	
+	Useful for comparing distributions: converts a 2D spatial field [lat, lon]
+	into a 1D array of valid measurements for statistical analysis.
+	
+	Args:
+		arr (ndarray): Multi-dimensional array (typically [latitude, longitude])
+	
+	Returns:
+		ndarray: 1D array of finite (non-NaN) values
+	"""
 	flat = np.asarray(arr).ravel()
 	return flat[np.isfinite(flat)]
 
 
 def plot_sst_distribution(base_values, anomaly_values, baseline_years, anomaly_year, out_path):
-	"""Plot histogram and boxplot comparing baseline and anomaly SST distributions."""
+	"""Create side-by-side histogram and boxplot comparing baseline vs anomaly SST distributions.
+	
+	Visualizes the statistical properties of SST in the anomaly year versus the baseline
+	climatology. Histograms show the probability density, with vertical lines marking
+	each distribution's mean. Boxplots provide a compact summary of quartiles and spread.
+	
+	Args:
+		base_values (ndarray): 1D array of SST values from baseline years
+		anomaly_values (ndarray): 1D array of SST values from anomaly year
+		baseline_years (list): List of years used for baseline
+		anomaly_year (int): Year being analyzed for anomalies
+		out_path (str or Path): Path to save the figure
+	"""
 	all_vals = np.concatenate([base_values, anomaly_values])
 	bins = np.linspace(np.nanmin(all_vals), np.nanmax(all_vals), 45)
 
@@ -86,8 +141,26 @@ def plot_sst_distribution(base_values, anomaly_values, baseline_years, anomaly_y
 	plt.savefig(out_path, dpi=160)
 	plt.show()
 
+
+# ─── Configuration ──────────────────────────────────────────────────────────
+# Output directory for verification results and plots
 RESULTS_DIR = "DataResults"
 def main():
+	"""Main verification workflow for SST data.
+	
+	Orchestrates the complete data verification process:
+	1. Load configuration (years, file paths, anomaly year)
+	2. Compute baseline climatology (mean across reference years)
+	3. Compute anomaly year mean field
+	4. Extract and compare statistical distributions
+	5. Generate comparison plots (histogram + boxplot)
+	6. Print summary statistics
+	
+	This helps confirm that:
+	- Data was loaded correctly
+	- The anomaly year shows expected differences from baseline
+	- There are no obvious data quality issues
+	"""
 	logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s")
     
     
@@ -132,5 +205,16 @@ def main():
 
 
 if __name__ == "__main__":
+	"""Execute the data verification workflow.
+	
+	This script is useful for:
+	- Validating that data was loaded correctly
+	- Understanding how different the anomaly year is from climatology
+	- Identifying potential data quality issues before statistical analysis
+	
+	Output includes:
+	- Summary statistics printed to console (mean SST values, anomaly magnitude)
+	- Comparison plots saved to DataResults/ directory
+	"""
 	main()
 
