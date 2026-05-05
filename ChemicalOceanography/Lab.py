@@ -36,56 +36,52 @@ def plot_raw_spectra(ds):
     plt.show()
 
 
-def get_absorbance_coefficient(ds, concentration_values, absorbance_columns, compound_name="Compound"):
-    target_wavelength = 220 # Choose a wavelength
-
-    # Get the row for that wavelength (find nearest if exact match doesn't exist)
-    row = ds.loc[(ds['wavelength'] - target_wavelength).abs().idxmin()]
-
-    x = np.array(concentration_values)      # Load the concentration values as a numpy array
-    y = row[list(absorbance_columns)].to_numpy()    # Load absorbance values for the specified columns
-    m, b = np.polyfit(x, y, 1)   # fit line
-
-    # Plot
-    plt.scatter(x, y, label="data")
-    plt.plot(x, m * x + b, label=f"fit: y={m:.4f}x+{b:.4f}")
-    plt.xlabel("Concentration (µM)")
-    plt.ylabel("Absorbance")
-    plt.title(f"{compound_name} calibration at {target_wavelength} nm")
-    plt.legend()
-    plt.show()
-
-    return m
-
-
-def get_calibration_slopes(ds, concentration_values, absorbance_columns, compound_name="Compound"):
-    """Return the calibration slope (epsilon * L) for every wavelength."""
-    x = np.array(concentration_values)
-    wavelengths = ds["wavelength"].to_numpy()
+def get_absorbance_coefficient(ds, concentration_values, absorbance_columns, compound_name="Compound", plot_wavelength=220):
+    """Fit A = mC + b at every wavelength.
+    
+    - Computes slope (epsilon*L) for all wavelengths
+    - Shows calibration plot at plot_wavelength for validation
+    - Returns array of slopes (same length as ds)
+    """
+    x = np.asarray(concentration_values)
     slopes = []
 
-    for wavelength in wavelengths:
-        row = ds.loc[(ds["wavelength"] - wavelength).abs().idxmin()]
-        y = row[list(absorbance_columns)].to_numpy()
-        if len(x) != len(y):
-            raise ValueError(
-                f"{compound_name}: {len(x)} concentrations but {len(y)} absorbance values"
-            )
+    for i in range(len(ds)):
+        y = ds.iloc[i][list(absorbance_columns)].to_numpy()
         m, _ = np.polyfit(x, y, 1)
         slopes.append(m)
 
-    return pd.DataFrame({"wavelength": wavelengths, f"{compound_name}_slope": slopes})
+    slopes_array = np.asarray(slopes)
+
+    # Show calibration at one wavelength for validation
+    row = ds.loc[(ds['wavelength'] - plot_wavelength).abs().idxmin()]
+    y_plot = row[list(absorbance_columns)].to_numpy()
+    m_plot, b_plot = np.polyfit(x, y_plot, 1)
+
+    plt.scatter(x, y_plot, label="data")
+    plt.plot(x, m_plot * x + b_plot, label=f"fit: y={m_plot:.4f}x+{b_plot:.4f}")
+    plt.xlabel("Concentration (µM)")
+    plt.ylabel("Absorbance")
+    plt.title(f"{compound_name} calibration at {plot_wavelength} nm")
+    plt.legend()
+    plt.show()
+
+    return slopes_array
+
 
 
 def remove_bromide(ds, bromide_slopes, sample_columns, sample_salinity, path_length=1.0):
-    """Subtract bromide absorbance from each sample spectrum."""
+    """Subtract bromide absorbance from each sample spectrum.
+    
+    bromide_slopes: array-like of slopes (epsilon*L) for each wavelength
+    """
     corrected = pd.DataFrame({"wavelength": ds["wavelength"]})
-    epsilon_br = bromide_slopes.set_index("wavelength")["Bromide_slope"]
+    eps_br = np.asarray(bromide_slopes)
 
     for sample_col, salinity in zip(sample_columns, sample_salinity):
         c_br = salinity * 23.25
-        a_br = ds["wavelength"].map(epsilon_br) * path_length * c_br
-        corrected[f"{sample_col}_no3_dom"] = ds[sample_col] - a_br
+        a_br = eps_br * path_length * c_br
+        corrected[f"{sample_col}_no3_dom"] = ds[sample_col].to_numpy() - a_br
 
     # Plot the corrected spectra
     wavelengths = corrected["wavelength"]
@@ -102,21 +98,60 @@ def remove_bromide(ds, bromide_slopes, sample_columns, sample_salinity, path_len
     return corrected
 
 
+
+def smooth(y, window=7):
+    """Simple moving-average smoothing (returns same-length array)."""
+    if window <= 1:
+        return y
+    kernel = np.ones(window) / window
+    return np.convolve(y, kernel, mode='same')
+
+
+def plot_epsilon(wavelengths, epsilon, label=None, smooth_window=9):
+    """Plot molar absorptivity ε(λ) with raw points and a smoothed curve."""
+    wl = np.asarray(wavelengths)
+    eps = np.asarray(epsilon)
+
+    plt.figure()
+    plt.scatter(wl, eps, s=18, color='C1', alpha=0.8, label=f'{label} points' if label else 'points')
+    eps_s = smooth(eps, window=smooth_window)
+    plt.plot(wl, eps_s, color='C0', lw=1.8, label=f'{label} (smoothed)' if label else 'smoothed')
+    plt.xlabel('Wavelength (nm)')
+    plt.ylabel('Molar absorptivity ε(λ) (slope / L)')
+    plt.title('Molar absorptivity ε(λ)')
+    plt.legend()
+    plt.grid(alpha=0.2)
+    plt.tight_layout()
+    plt.show()
+
+
 # ── Main Execution ───────────────────────────────────────────────────────────
 if __name__ == "__main__":
 
     # STEP 1: Plot the raw spectra to visually inspect the data
     plot_raw_spectra(ds)
 
-    # STEP 2: Calculate the absorbance coefficients (slopes) for nitrate and bromide
-    nitrate_slope = get_absorbance_coefficient(ds, conc_nitrate, ds_nitrate.columns, "Nitrate")
-    bromide_slope = get_absorbance_coefficient(ds, conc_bromide, ds_bromide.columns, "Bromide")
+    # STEP 2: Calculate the absorbance coefficients (slopes) for the full spectrum
+    nitrate_slopes = get_absorbance_coefficient(ds, conc_nitrate, ds_nitrate.columns, "Nitrate")
+    bromide_slopes = get_absorbance_coefficient(ds, conc_bromide, ds_bromide.columns, "Bromide")
 
-    # STEP 3: Remove Bromide
-    bromide_slopes = get_calibration_slopes(ds, conc_bromide, ds_bromide.columns, "Bromide")
+    # STEP 2b: Plot ε(λ) for nitrate and bromide
+    plot_epsilon(ds['wavelength'], nitrate_slopes, label='Nitrate')
+    plot_epsilon(ds['wavelength'], bromide_slopes, label='Bromide')
+
+    # STEP 3: Remove Bromide using the full-spectrum bromide slopes
     corrected_spectra = remove_bromide(ds, bromide_slopes, ds_samples.columns, sample_salinity)
 
-    print(corrected_spectra.head())
+    slopes = []
+    for i, wavelength in enumerate(ds['wavelength']):
+        current_slope = nitrate_slopes[i]
+        slopes.append(current_slope)
 
-
-
+    plt.figure()
+    plt.plot(ds['wavelength'], slopes, 'o', color='C1', alpha=0.8, markersize=8)
+    plt.xlabel('Wavelength (nm)')
+    plt.ylabel('Molar absorptivity ε(λ) (slope / L)')
+    plt.title('Molar absorptivity ε(λ)')
+    plt.grid(alpha=0.2)
+    plt.tight_layout()
+    plt.show()

@@ -7,20 +7,20 @@ import logging
 # ── User settings ───────────────────────────────────────────────────────────
 # These settings control which data to analyze and how to aggregate it
 
-AGG_FUNC = 'mean'  # Choose 'mean' or 'std' to aggregate daily samples into single maps
+AGG_FUNC = 'std'  # Choose 'mean' or 'std' to aggregate daily samples into single maps
 
-# The target year to compare against the baseline (reference years)
-ANOMALY_YEAR = 2016
+# # The target year to compare against the baseline (reference years)
+# ANOMALY_YEAR = 2016
 
-# File naming prefix - matches the data file naming convention
-FILE_CORE_NAME = "mhw2016JFM"
+# # File naming prefix - matches the data file naming convention
+# FILE_CORE_NAME = "mhw2016JFM"
 
-# All years in the dataset. ANOMALY_YEAR will be compared against the other years.
-YEARS = [2013, 2014, 2015, 2016, 2017, 2018, 2019]
+# # All years in the dataset. ANOMALY_YEAR will be compared against the other years.
+# YEARS = [2013, 2014, 2015, 2016, 2017, 2018, 2019]
 
-# ANOMALY_YEAR = 2023
-# FILE_CORE_NAME = "mhw2023JJA"
-# YEARS = [2018, 2019, 2020, 2021, 2022, 2023, 2024]
+ANOMALY_YEAR = 2023
+FILE_CORE_NAME = "mhw2023JJA"
+YEARS = [2018, 2019, 2020, 2021, 2022, 2023, 2024]
 
 # ── Configuration ───────────────────────────────────────────────────────────
 # Data source and output settings, plus measurement-specific metadata
@@ -247,7 +247,7 @@ def plot_year_vs_anomaly(lon, lat, year_avg, anomaly, measurement, year, save_pa
     fig.colorbar(img1, ax=ax1, label=f'{mlabel} ({units})')
     ax1.set_xlabel('Longitude (°E)')
     ax1.set_ylabel('Latitude (°N)')
-    ax1.set_title(f'{AGG_LABELS[AGG_FUNC]} {mlabel} — JFM {year}\n(NW Atlantic, {YEARS[0]}–{YEARS[-1]} dataset)')
+    ax1.set_title(f'{AGG_LABELS[AGG_FUNC]} {mlabel} — JJA {year}\n(NW Atlantic, {YEARS[0]}–{YEARS[-1]} dataset)')
 
     img2 = ax2.pcolormesh(lon, lat, anomaly, cmap=CMAP_ANOMALY, shading='auto',
                           vmin=-vmax_anom, vmax=vmax_anom)
@@ -273,7 +273,7 @@ def main(fname, m, label):
     # Baseline across all years
     lon, lat, baseline = compute_baseline(fname, m, YEARS)
     plot_heatmap(lon, lat, baseline, m,
-                 f'Baseline {AGG_LABELS[agg]} {label}\nJFM {YEARS[0]}–{YEARS[-1]} (NW Atlantic)',
+                 f'Baseline {AGG_LABELS[agg]} {label}\nJJA {YEARS[0]}–{YEARS[-1]} (NW Atlantic)',
                  f'{RESULTS_DIR}/{FILE_CORE_NAME}_{agg}_{m}_baseline.png')
 
     # Anomaly for ANOMALY_YEAR
