@@ -1,11 +1,4 @@
-""" Hydrodynamic Forces on a Monopile in Regular Waves 
-
-    Scenario 1: Forces without vertical acceleration (drag only) 
-    Scenario 2: Forces with vertical acceleration (drag + added mass) """
-
-# ============================================================================
-# IMPORTS
-# ============================================================================
+""" Monopile Loads for a Single (Regular) Wave"""
 
 import os 
 import sys
@@ -24,39 +17,23 @@ from monopile import forceIntegrate
 # ============================================================================
 # SETUP: Load Input Files
 # ============================================================================
-
-# Define input file directory and helper function
 input_dir = "inputVariables"
-get_input_file = lambda filename: os.path.join(os.path.dirname(__file__), input_dir, filename)
+get_input_file = lambda fname: os.path.join(os.path.dirname(__file__), input_dir, fname)
 
-# Load wave properties (period, amplitude, etc.)
-wave_data = loadFromJSON(get_input_file("wave2.json"))
-
-# Load time discretization settings (duration, time step)
+# Load monopile, wave and time properties (period, amplitude, etc.)
+monopile_props = loadFromJSON(get_input_file("monopile.json"))
+wave_data = loadFromJSON(get_input_file("wave_regular.json"))
 time_data = loadFromJSON(get_input_file("time.json"))
 wave_data.update(time_data)
-
-# Create time vector from 0 to duration with specified time step
 wave_data["t"] = np.arange(0., wave_data["TDur"], wave_data["dt"])
 
-# ============================================================================
-# WAVE KINEMATICS: Calculate wave properties and water motion
-# ============================================================================
+# Get wave parameters (wavelength, wavenumber, etc.)
+wave_data = calculateRegularWaveParameters(wave_data) 
 
-# Calculate wave parameters (wavelength, wavenumber, etc.)
-wave_data = calculateRegularWaveParameters(wave_data)
-
-# Calculate surface elevation (η) over time
-wave_data = calculateFreeSurfaceElevationTimeSeries(wave_data)
-
-# Calculate water particle velocities and accelerations at all depths
+# Recompute kinematics to ensure fields exist locally
+wave_data = calculateFreeSurfaceElevationTimeSeries(wave_data) 
 wave_data = calculateKinematics(wave_data)
 
-# ============================================================================
-# LOAD MONOPILE PROPERTIES
-# ============================================================================
-
-monopile_properties = loadFromJSON(get_input_file("monopile.json"))
 
 # ============================================================================
 # CALCULATE FORCES (Scenario 1: Without vertical acceleration)
@@ -65,8 +42,8 @@ monopile_properties = loadFromJSON(get_input_file("monopile.json"))
 # Initialize force arrays
 force_data = {}
 force_data["t"] = wave_data["t"]
-force_data["horizontal_force"] = np.zeros_like(wave_data["t"])
-force_data["moment"] = np.zeros_like(wave_data["t"])
+force_data["F"] = np.zeros_like(wave_data["t"])
+force_data["M"] = np.zeros_like(wave_data["t"])
 
 # Calculate forces at each time step considering only horizontal velocity (drag forces)
 for time_index, time_value in enumerate(wave_data["t"]):
@@ -77,8 +54,8 @@ for time_index, time_value in enumerate(wave_data["t"]):
     vertical_acceleration = np.zeros_like(wave_data["ut"][time_index, :])
     
     # Integrate forces over monopile depth
-    force_data["horizontal_force"][time_index], force_data["moment"][time_index] = \
-        forceIntegrate(monopile_properties, horizontal_velocity, vertical_acceleration, 
+    force_data["F"][time_index], force_data["M"][time_index] = \
+        forceIntegrate(monopile_props, horizontal_velocity, vertical_acceleration, 
                       wave_data["z"], 0.)
 
 # ============================================================================
@@ -95,7 +72,7 @@ axes[0].set_ylabel("Surface Elevation η(t) [m]")
 axes[0].grid(True, alpha=0.3)
 
 # Plot 1b: Horizontal forces
-axes[1].plot(force_data["t"], force_data["horizontal_force"], linewidth=2)
+axes[1].plot(force_data["t"], force_data["F"], linewidth=2)
 axes[1].set_title("Horizontal Force on Monopile vs Time (Drag Only)", fontsize=12, fontweight='bold')
 axes[1].set_xlabel("Time [s]")
 axes[1].set_ylabel("Horizontal Force F(t) [N]")
@@ -119,8 +96,8 @@ for time_index, time_value in enumerate(wave_data["t"]):
     vertical_acceleration = wave_data["ut"][time_index, :]
     
     # Integrate forces over monopile depth
-    force_data["horizontal_force"][time_index], force_data["moment"][time_index] = \
-        forceIntegrate(monopile_properties, horizontal_velocity, vertical_acceleration, 
+    force_data["F"][time_index], force_data["M"][time_index] = \
+        forceIntegrate(monopile_props, horizontal_velocity, vertical_acceleration, 
                       wave_data["z"], 0.)
 
 # ============================================================================
@@ -137,7 +114,7 @@ axes[0].set_ylabel("Surface Elevation η(t) [m]")
 axes[0].grid(True, alpha=0.3)
 
 # Plot 2b: Horizontal forces (now with vertical acceleration effect)
-axes[1].plot(force_data["t"], force_data["horizontal_force"], linewidth=2, color='orange')
+axes[1].plot(force_data["t"], force_data["F"], linewidth=2, color='orange')
 axes[1].set_title("Horizontal Force on Monopile vs Time (Drag + Added Mass)", fontsize=12, fontweight='bold')
 axes[1].set_xlabel("Time [s]")
 axes[1].set_ylabel("Horizontal Force F(t) [N]")

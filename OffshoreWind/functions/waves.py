@@ -17,17 +17,32 @@ def calculateRegularWaveParameters(waveDict):
 
     return outputDict
 
+def calculateJONSWAPGamma(waveDict):
+    """Compute JONSWAP gamma from the Tp/Hs ratio if not provided."""
+    Hs = waveDict["Hs"]
+    Tp = waveDict["Tp"]
+    ratio = Tp / np.sqrt(Hs)
+
+    if ratio <= 3.6:
+        return 5.0
+    elif ratio <= 5.0:
+        return np.exp(5.75 - 1.15 * ratio)
+    else:
+        return 1.0
+
+
 def calculateJONSWAPSpectrum(waveDict):
            
     Hs = waveDict["Hs"]
     Tp = waveDict["Tp"]
     
-    # If defined, get the gamma. Ohterwise default to 1.0
-    gamma = waveDict.get("gamma", 1.0) # Calculated gamma is 1.59 for Tp=13 and Hs=8
-                    
+    # If defined, use the supplied gamma. Otherwise compute it from Tp/Hs.
+    gamma = waveDict.get("gamma")
+    if gamma is None:
+        gamma = calculateJONSWAPGamma(waveDict)
+
     # Calculate frequency information
     df = waveDict["TDur"]**-1.0
-    #df = 600**-1.0
     f = np.arange(df, waveDict["fHighCut"], df)
     
     # Spectral width parameter
@@ -43,22 +58,17 @@ def calculateJONSWAPSpectrum(waveDict):
     Spm = 5/16 * Hs**2 * fp**4 * f**(-5) * \
             np.exp( - 5/4 * (f  / fp)**(-4) ) 
     # Jonswap spectrum
-    # FIXME Assignment 1 Q6: program the correct spectrum
     Spectrum = 5/16 * Hs**2 * fp**4 * f**(-5) * \
             np.exp( - 5/4 * (f  / fp)**(-4) ) * \
             (1-0.287 * np.log(gamma))* gamma**(np.exp(-0.5 * ((f/fp - 1)/sigma)**2))
     amplitude = np.sqrt(2*Spectrum*df)
-    
-    #np.random.seed(waveDict["randomSeed"])
-    #epsilon=np.array([np.random.uniform(0, 2*np.pi) for _ in range(len(f))])
-    # Store it inside the waves dictionary
-    outputDict = dict()
-    outputDict.update(waveDict)
+
+    outputDict = dict(waveDict)
+    outputDict["gamma"] = gamma
     outputDict["Spectrum"] = Spectrum
     outputDict["amplitude"] = amplitude
     outputDict["f"] = f
-    #outputDict["randomPhases"] = epsilon
-    
+
     return outputDict
        
 def calculateFreeSurfaceElevationTimeSeries(waveDict):
@@ -99,13 +109,10 @@ def calculateKinematics(inputDict, wheelerStretching=False):
     
     for i_, _ in enumerate(t):
         for j_, _ in enumerate(z):
-            # FIXME Assignment 1 Q2.2
-            # Fix velocity calculation
+
             # Horizontal velocity
             u[i_, j_] = np.sum(inputDict["amplitude"]*omega*np.cosh(k*(z[j_]+h))/np.sinh(k*h)*np.cos(omega*t[i_] + inputDict["randomPhases"]))
         
-            # FIXME Assignment 1 Q2.3
-            # Code the ut expression
             # Acceleration ut
             ut[i_, j_] = ut[i_, j_] = -np.sum(inputDict["amplitude"] * (omega**2)* (np.cosh(k * (z[j_] + h)) / np.sinh(k * h))* np.sin(omega * t[i_] + inputDict["randomPhases"]))
     
@@ -121,7 +128,7 @@ def calculateFreeSurfaceElevationTimeSeriesFFT(waveDict):
     t = waveDict["t"]
     f = waveDict["f"]
     
-    # FIXME Assignment 3 Q1.8: compute the fft kernel and perform the IFFT
+    # Compute the fft kernel and perform the IFFT
     M = len(t)
     freeSurfTimeSeriesKernel = waveDict["amplitude"] * np.exp(1j * waveDict["randomPhases"]) # compute the freq. domain kernel and pad to M
     freeSurfTimeSeries = M * np.real(np.fft.ifft(pad2(freeSurfTimeSeriesKernel, M))) # perform the IFFT in this line
@@ -150,7 +157,7 @@ def calculateKinematicsFFT(inputDict):
     
     for j_, z_ in enumerate(z):
         
-        # FIXME Assignment 3 Q1.8: compute the fft kernel and perform the IFFT
+        # Compute the fft kernel and perform the IFFT
         uKernel = inputDict["amplitude"]*omega*np.cosh(k*(z_+h))/np.sinh(k*h) * np.exp(1j * inputDict["randomPhases"]) # compute the freq. domain kernel and pad to M
         u[:, j_] = M * np.real(np.fft.ifft(pad2(uKernel, M))) # perform the IFFT in this line
 
@@ -175,7 +182,6 @@ def calculateRegularWaveFrequencyInformation(waveDict):
           raise ValueError("Your input dictionary specifies an irregular sea state, but you have called the regular wave routine.")
                        
     # Calculate frequency information
-    
     f = np.array([1./T])
     a = np.array([H/2.])
     
@@ -183,7 +189,6 @@ def calculateRegularWaveFrequencyInformation(waveDict):
     outputDict = dict()
     outputDict.update(waveDict)
     outputDict["Spectrum"] = np.nan
-    #outputDict["amplitudeSpectrum"] = a
     outputDict["amplitude"] = a
     outputDict["f"] = f
     outputDict["randomPhases"] = np.array([0.])

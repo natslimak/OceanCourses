@@ -1,11 +1,4 @@
-""" Hydrodynamic Forces on a Monopile in Regular Waves with Wheeler-stretched Depths
-
-    Scenario 1: Forces without vertical acceleration (drag only)
-    Scenario 2: Forces with vertical acceleration (drag + added mass) """
-
-# ============================================================================
-# IMPORTS
-# ============================================================================
+""" Monopile Loads for a Single (Regular) Wave with Wheeler-stretched Depths"""
 
 import os
 import sys
@@ -27,19 +20,19 @@ from monopile import forceIntegrate
 input_dir = "inputVariables"
 get_input_file = lambda fname: os.path.join(os.path.dirname(__file__), input_dir, fname)
 
-# Load wave and time data (same inputs as used in main_q2)
-wave_data = loadFromJSON(get_input_file("wave2.json"))
+# Load monopile, wave and time properties (period, amplitude, etc.)
+monopile_props = loadFromJSON(get_input_file("monopile.json"))
+wave_data = loadFromJSON(get_input_file("wave_regular.json"))
 time_data = loadFromJSON(get_input_file("time.json"))
 wave_data.update(time_data)
 wave_data["t"] = np.arange(0., wave_data["TDur"], wave_data["dt"])
 
-# Recompute kinematics to ensure fields exist locally
-wave_data = calculateRegularWaveParameters(wave_data)
-wave_data = calculateFreeSurfaceElevationTimeSeries(wave_data)
-wave_data = calculateKinematics(wave_data)
+# Get wave parameters (wavelength, wavenumber, etc.)
+wave_data = calculateRegularWaveParameters(wave_data) 
 
-# Load monopile properties
-monopile_props = loadFromJSON(get_input_file("monopile.json"))
+# Recompute kinematics to ensure fields exist locally
+wave_data = calculateFreeSurfaceElevationTimeSeries(wave_data) 
+wave_data = calculateKinematics(wave_data)
 
 
 # ============================================================================
@@ -61,7 +54,7 @@ wave_data["z_phys"] = z_phys
 # We'll compute forces for two cases: nominal (use z_ref) and wheeler-stretched (use z_phys)
 # For each case we compute: combined (u + ut), drag-only (u only), inertia-only (ut only)
 # ============================================================================
-nt = wave_data["t"].shape[0]
+nt = wave_data["t"].shape[0] # number of time steps
 force_nominal = {"t": wave_data["t"], "F_combined": np.zeros(nt), "F_drag": np.zeros(nt), "F_inertia": np.zeros(nt)}
 force_wheeler = {"t": wave_data["t"], "F_combined": np.zeros(nt), "F_drag": np.zeros(nt), "F_inertia": np.zeros(nt)}
 
