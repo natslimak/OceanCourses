@@ -1,16 +1,12 @@
-'''
-Filename: c:\\Users\\fabpi\\OneDrive - Danmarks Tekniske Universitet\\Dokumenter\\Courses\\46211_OffshoreWindEnergy\\2024\\Module3\\Lectures\\classical\\main_q1.py
-Path: c:\\Users\\fabpi\\OneDrive - Danmarks Tekniske Universitet\\Dokumenter\\Courses\\46211_OffshoreWindEnergy\\2024\\Module3\\Lectures\\classical
-Created Date: Monday, September 30th 2024, 12:04:08 pm
-Author: Fabio Pierella
+""" Wind and Wave Loading on a Monopile Offshore Wind Turbine"""
 
-Copyright (c) 2024 DTU Wind and Energy Systems
-'''
 import os
 import sys 
+import pylab as plt
+import numpy as np
 
-# Add the function folder to the path
-helpers_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..','functions', 'python'))
+# Add the functions folder to the path 
+helpers_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'functions'))
 sys.path.append(helpers_path)
 
 from waves import calculateJONSWAPSpectrum, calculateFreeSurfaceElevationTimeSeries, calculateKinematics
@@ -18,96 +14,105 @@ from wind import calculateKaimalSpectrum, calculateWindTimeSeries
 from common import loadFromJSON, saveToJSON, generateRandomPhases
 from monopile import forceIntegrate
 from rotor import F_wind
-import pylab as plt
-import os.path
-import numpy as np
 
-# Location of input files
-# Shorten the imports
-inputVariables = "inputVariables"
-savedStates = "savedStates"
-fp = lambda x: os.path.join(os.path.dirname(__file__),inputVariables,x)
-ss = lambda x: os.path.join(os.path.dirname(__file__), '..', '..', savedStates, x)
+# ============================================================================
+# SETUP: Load Input Files
+# ============================================================================
+input_dir = "inputVariables"
+output_dir = "savedStates"
+get_input_file = lambda fname: os.path.join(os.path.dirname(__file__), input_dir, fname)
+get_output_file = lambda fname: os.path.join(os.path.dirname(__file__), '..', '..', output_dir, fname)
 
-# Load the wind info
-# FIXME Assignment 3 Q1.4: check correctness of json input dicts
-wind4 = loadFromJSON(fp("wind4.json"))
-time4 = loadFromJSON(fp("time.json"))
-wind4.update(time4)
+# Load the monopile, wind and wave data, as well as the time properties
+monopile_props = loadFromJSON(get_input_file("monopile.json"))
+wind_data = loadFromJSON(get_input_file("wind.json"))
+time_data = loadFromJSON(get_input_file("time.json"))
+wave_data = loadFromJSON(get_input_file("wave_irregular.json"))
 
-# Load the waves stuff
-waves4 = loadFromJSON(fp("wave1.json"))
-waves4.update(time4)
+wind_data.update(time_data)
+wave_data.update(time_data)
 
-wind4["t"] = np.arange(0., wind4["TDur"], wind4["dt"])
-waves4["t"] = np.arange(0., waves4["TDur"], waves4["dt"])
+wind_data["t"] = np.arange(0., wind_data["TDur"], wind_data["dt"])
+wave_data["t"] = np.arange(0., wave_data["TDur"], wave_data["dt"])
 
-# Compute the time series
-wind4 = calculateKaimalSpectrum(wind4)
-wind4 = generateRandomPhases(wind4, seed=1)
-wind4 = calculateWindTimeSeries(wind4)
+# Compute the Kaimal spectrum and generate a wind speed time series at hub height
+randomSeedWind = 1
+wind_data = calculateKaimalSpectrum(wind_data)
+wind_data = generateRandomPhases(wind_data, seed=randomSeedWind)
+wind_data = calculateWindTimeSeries(wind_data)
 
-# Compute waves
-waves4 = calculateJONSWAPSpectrum(waves4)
-waves4 = generateRandomPhases(waves4, seed=2)
-waves4 = calculateFreeSurfaceElevationTimeSeries(waves4)
-waves4 = calculateKinematics(waves4)
-h = waves4["h"]
+# Compute the JONSWAP spectrum and generate a wave time series
+randomSeedWave = 2
+wave_data = calculateJONSWAPSpectrum(wave_data)
+wave_data = generateRandomPhases(wave_data, seed=randomSeedWave)
+wave_data = calculateFreeSurfaceElevationTimeSeries(wave_data)
+wave_data = calculateKinematics(wave_data)
+h = wave_data["h"]
 
-# Load the monopile
-monopileDict = loadFromJSON(fp("monopile.json"))
 
-# Wave force
+# ============================================================================
+# Get the wind thrust force and wave force time series
+# ============================================================================
+
+# WAVE FORCE
 waveForce = dict()
-waveForce["t"] = waves4["t"]
-waveForce["F"], waveForce["M"] = np.zeros_like(waves4["t"]), np.zeros_like(waves4["t"])
+waveForce["t"] = wave_data["t"]
+waveForce["F"], waveForce["M"] = np.zeros_like(wave_data["t"]), np.zeros_like(wave_data["t"])
 
-for i_, t_ in enumerate(waves4["t"]):
-	# FIXME Assignment 3 Q1.4: call the forceIntegrate function from monopile.py to get the wave loads
-    waveForce["F"][i_], waveForce["M"][i_]  = forceIntegrate(monopileDict, waves4["u"][i_,:], waves4["ut"][i_,:],
-        waves4["z"], 0., waves4["z"][0]) # Moment at seabed
+for i_, t_ in enumerate(wave_data["t"]):
+    waveForce["F"][i_], waveForce["M"][i_]  = forceIntegrate(monopile_props, wave_data["u"][i_,:], wave_data["ut"][i_,:],
+        wave_data["z"], 0., wave_data["z"][0]) # Moment at seabed
 
-# Wind force
 
-iea22mw = loadFromJSON(fp("iea22mw.json"))
+# WIND FORCE
+iea22mw = loadFromJSON(get_input_file("iea22mw.json"))
 iea22mw["ARotor"] = iea22mw["DRotor"]**2*np.pi/4
 
 windForce = dict()
-windForce["t"] = wind4["t"]
-windForce["F"], windForce["M"] = np.zeros_like(wind4["t"]), np.zeros_like(wind4["t"])
+windForce["t"] = wind_data["t"]
+windForce["F"], windForce["M"] = np.zeros_like(wind_data["t"]), np.zeros_like(wind_data["t"])
 
-for i_, t_ in enumerate(wind4["t"]):
-	# FIXME Assignment 3 Q1.4: call the F_wind from wind.py to get the total wind force
-    windForce["F"][i_] = F_wind(iea22mw, wind4["V_10"], wind4["V_hub"][i_])    
-    windForce["M"][i_] = windForce["F"][i_]*(monopileDict["zBeamNodal"][-1]+h)
+for i_, t_ in enumerate(wind_data["t"]):
+    windForce["F"][i_] = F_wind(iea22mw, wind_data["V_10"], wind_data["V_hub"][i_])    
+    windForce["M"][i_] = windForce["F"][i_]*(monopile_props["zBeamNodal"][-1]+h)
 
-# ----------------------------------------------
+
+# ============================================================================
 # Calculating total force wind and waves
-# ----------------------------------------------
-totalForce = dict()
-totalForce["t"] = wind4["t"]
-totalForce["F"], totalForce["M"] = np.zeros_like(wind4["t"]), np.zeros_like(wind4["t"])
+# ============================================================================
+# Ensure wind and wave time series have the same length before combining
+nt_wind = len(wind_data["t"])
+nt_wave = len(wave_data["t"])
+nt = min(nt_wind, nt_wave)
+if nt_wind != nt_wave:
+    print(f"Warning: wind and wave time series have different lengths (wind={nt_wind}, wave={nt_wave}). Truncating to {nt} samples.")
 
-for i_ in range(len(wind4["t"])):
-    totalForce["F"][i_] = windForce["F"][i_] + waveForce["F"][i_]
-    totalForce["M"][i_] = windForce["M"][i_] + waveForce["M"][i_]
+# Truncate arrays to common length if necessary
+wind_t = windForce["t"][:nt]
+wind_F = windForce["F"][:nt]
+wind_M = windForce["M"][:nt]
+wave_t = waveForce["t"][:nt]
+wave_F = waveForce["F"][:nt]
+wave_M = waveForce["M"][:nt]
 
-'''    
-plt.figure()
-plt.plot(waves4["t"], waves4["eta"])
+totalForce = {
+    "t": wind_t,
+    "F": wind_F + wave_F,
+    "M": wind_M + wave_M,
+}
 
-plt.figure()
-plt.plot(waveForce["t"], waveForce["F"])
-'''
 
-# Save for later use
-os.makedirs(savedStates, exist_ok=True)
-saveToJSON(waves4, ss("waves4.json"))
-saveToJSON(wind4, ss("wind4.json" ))
+# Save the results for later use
+# Ensure the directory used by get_output_file() exists (was previously creating a local `savedStates` folder)
+output_folder = os.path.dirname(get_output_file("wave_data.json"))
+os.makedirs(output_folder, exist_ok=True)
+saveToJSON(wave_data, get_output_file("wave_data.json"))
+saveToJSON(wind_data, get_output_file("wind_data.json"))
 
-# -----------------------------
-# Plotting
-# -----------------------------
+
+# ============================================================================
+# Plots: Wind and wave forces, and total overturning moment
+# ============================================================================
 plt.figure(figsize=(12, 6))
 plt.plot(windForce["t"], windForce["M"], label='Wind Load', color='blue')
 plt.plot(waveForce["t"], waveForce["M"], label='Wave Load', color='green')
@@ -119,9 +124,11 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-# ----------------------------------------------
-# Statistics
-# ----------------------------------------------
+
+# ============================================================================
+# Statistics of the wind speed time series and the total wind force time series
+# # ============================================================================
+
 print(f"\nTotal Wind Moment:")
 print(f"  Mean: {np.mean(windForce['M'])/1e6:.3f} MNm")
 print(f"  Std: {np.std(windForce['M'])/1e6:.3f} MNm")
