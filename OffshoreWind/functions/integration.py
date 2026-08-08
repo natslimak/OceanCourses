@@ -95,7 +95,7 @@ def GFCalc(t, alphaDot, structure, rotor, waves, wind, rotor_state):
     df = forceDistributed(structure, u, ut, z, x_dot_submerged)
     
     # FIXME Assignment 3 Q1.6: Add the generalized forcing from the waves
-    GFWaves = np.trapz(df * phiNodalSubmerged, waves["z"])
+    GFWaves = np.trapezoid(df * phiNodalSubmerged, waves["z"])
     
     # Wind contribution to Generalized Forcing
     i_ = lookup(wind["t"], t)
