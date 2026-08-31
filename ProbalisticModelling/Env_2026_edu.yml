@@ -1,0 +1,30 @@
+name: Env_2026_edu
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - pandas
+  - numpy
+  - scipy
+  - scikit-learn
+  - jupyter
+  - spyder
+  - ipython
+  - lxml
+  - matplotlib
+  - netcdf4
+  - xarray
+  - keras
+  - seaborn
+  - tornado
+  - xlrd
+  - openpyxl
+  - tensorflow=2.18.1
+  - pip
+  - pip:
+      - tensorflow-probability==0.24.0
+      - openturns
+      - chaospy
+      - nbdime
+      - altair
+      - plotnine
