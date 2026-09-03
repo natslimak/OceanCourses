@@ -1,10 +1,12 @@
+" Impact of varying the control gain parameter, gamma, on the dynamic response "
+
 import numpy as np
 import pylab as plt
 import os
 import sys  
 
-# Add the function folder to the path
-helpers_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'functions', 'python'))
+# Add the function folder to the path so the helper modules can be imported.
+helpers_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'functions'))
 sys.path.append(helpers_path)
 
 from common import *
@@ -14,35 +16,39 @@ from integration import ode4
 from floaterIntegration import dqdt
 from plotting import makeplots 
 
-inputVariables = "inputVariables"
-savedStates = "savedStates"
-fp = lambda x: os.path.join(os.path.dirname(__file__),inputVariables,x)
-ss = lambda x: os.path.join(os.path.dirname(__file__), '..', '..', savedStates, x)
-ov = lambda x: os.path.join(os.path.dirname(__file__), '..', '..', 'outputVariables', x)
 
-of = "outputFig"
-os.makedirs(of, exist_ok=True)
-def ofy(fileName):
-    return os.path.join(of, fileName)
+# ============================================================================
+# SETUP: Load Input Files
+# ============================================================================
+input_dir = "inputVariables"
+output_dir = "savedStates"
+figure_dir = "outputFig"
+get_input_file = lambda fname: os.path.join(os.path.dirname(__file__), input_dir, fname)
+get_output_file = lambda fname: os.path.join(os.path.dirname(__file__), '..', output_dir, fname)
+get_output_figure = lambda fname: os.path.join(os.path.dirname(__file__), figure_dir, fname)
 
-# Close any existing plots
-plt.close('all')
 
-# %% ----Q18: RESPONSE TO GAMMA PARAMETERS--------------------------------------
-
+# ============================================================================
+# SETUP: Load other important Files 
+# ============================================================================
 # Load the time information
-timeInfo = loadFromJSON(fp('time.json'))
-
+timeInfo = loadFromJSON(get_input_file('time.json'))
 
 # Gamma values for the four cases
 gammas = np.linspace(0,0.5,15)
 labels = ['Inst. control', 'Inst. control', 'Inst. control', 'Inst. control']
 
-surge=[]
-pitch=[]
+surge = []
+pitch = []
 
+
+# ============================================================================
+# Get the Responses for the different Gamma values
+# ============================================================================
 for i in range(len(gammas)):
-    wind = loadFromJSON(fp('wind16B.json'))
+
+    # Load the wind conditions
+    wind = loadFromJSON(get_input_file('_wind_above_rated.json'))
     wind.update(timeInfo)
     wind['t'] = np.arange(0, wind['TDur'], wind['dt'])
     wind["V_hub"] = np.zeros_like(wind["t"])
@@ -51,13 +57,13 @@ for i in range(len(gammas)):
     wind = calculateWindTimeSeries(wind)
 
     # Load the rotor and other necessary parameters
-    IEA22MWRotor = loadFromJSON(fp('iea22mw.json'))
+    IEA22MWRotor = loadFromJSON(get_input_file('iea22mw.json'))
     IEA22MWRotor['ARotor'] = 0.25 * np.pi * IEA22MWRotor['DRotor']**2
     IEA22MWRotor['gamma'] = gammas[i]
     IEA22MWRotor['active'] = True
 
     # Disable drag forcing
-    SparBuoyData = loadFromJSON(ov("SparBuoyDataComplete.json"))
+    SparBuoyData = loadFromJSON(get_output_file("SparBuoyDataComplete.json"))
     SparBuoyData['CD'] = 0  # Dry decay test
 
    # Vertical locations along floater
@@ -65,13 +71,12 @@ for i in range(len(gammas)):
     SparBuoyData['z'] = z
 
     # Calculate the wave kinematics from Irregular wave
-    waves = loadFromJSON(fp('nowaves.json'))
+    waves = loadFromJSON(get_input_file('nowaves.json'))
     waves['z'] = z
     random_seed_waves = 1
     waves.update(timeInfo)
     waves['t'] = np.arange(0, waves['TDur'], waves['dt'])
-    # fixme: Add wave calculations here (use 4 functions if applicable)
-    waves['eta'] = np.zeros_like(waves['t'])        # free surface elevation
+    waves['eta'] = np.zeros_like(waves['t'])                     # free surface elevation
     waves['u']   = np.zeros((len(waves['t']), len(waves['z'])))  # horizontal velocity at each z
     waves['ut']  = np.zeros((len(waves['t']), len(waves['z'])))  # vertical velocity at each z
 
@@ -86,19 +91,20 @@ for i in range(len(gammas)):
     response["x5"] = q[:, 1]
 
     # Print the standard deviations
-
     surge.append(np.std(q[:,0]))
     pitch.append(np.std(q[:,1]))
 
+
+# Plot the standard deviations of surge and pitch as a function of gamma
 plt.plot(gammas,surge,'o')
 plt.xlabel('gamma')
-plt.ylabel('surge standard deviation [m]')
+plt.ylabel('Surge standard deviation [m]')
 plt.grid()
 plt.show()
 
 plt.plot(gammas,pitch,'o')
 plt.xlabel('gamma')
-plt.ylabel(' pitch standard deviation [°]')
+plt.ylabel('Pitch standard deviation [°]')
 plt.grid()
 plt.show()
 

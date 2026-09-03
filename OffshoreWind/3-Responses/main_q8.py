@@ -1,16 +1,11 @@
-'''
-Filename: c:\\Users\\fabpi\\modules\\46211assignmentsolution\\reports\\Report3\\2024\\solution\\python\\classicalSolution\\main_q8.py
-Path: c:\\Users\\fabpi\\modules\\46211assignmentsolution\\reports\\Report3\\2024\\solution\\python\\classicalSolution
-Created Date: Thursday, October 10th 2024, 10:27:58 pm
-Author: Fabio Pierella
+''' Slow and Fast Wave and Wind Calculations for Response Analysis'''
 
-Copyright (c) 2024 DTU Wind and Energy Systems
-'''
+
 import os
 import sys 
 
-# Add the function folder to the path
-helpers_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'functions', 'python'))
+# Add the function folder to the path so the helper modules can be imported.
+helpers_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'functions'))
 sys.path.append(helpers_path)
 
 from waves import calculateJONSWAPSpectrum, calculateFreeSurfaceElevationTimeSeries, calculateKinematics, calculateFreeSurfaceElevationTimeSeriesFFT, calculateKinematicsFFT
@@ -20,47 +15,51 @@ import pylab as plt
 import os.path
 import numpy as np
 
-# Location of input files
-# Shorten the imports
-inputVariables = "inputVariables"
-savedStates = "savedStates"
-fp = lambda x: os.path.join(os.path.dirname(__file__),inputVariables,x)
-ss = lambda x: os.path.join(os.path.dirname(__file__), '..', '..', savedStates, x)
 
-waves = loadFromJSON(ss("waves4.json"))
-timeInfo = loadFromJSON(fp("time.json"))
+# ============================================================================
+# SETUP: Load Input Files
+# ============================================================================
+input_dir = "inputVariables"
+output_dir = "savedStates"
+get_input_file = lambda fname: os.path.join(os.path.dirname(__file__), input_dir, fname)
+get_output_file = lambda fname: os.path.join(os.path.dirname(__file__), '..', '..', output_dir, fname)
+
+
+
+# WAVES
+waves = loadFromJSON(get_input_file("waves4.json"))
+timeInfo = loadFromJSON(get_input_file("time.json"))
 waves.update(timeInfo)
-
-# Calculate the time vector
 waves["t"] = np.arange(0., waves["TDur"], waves["dt"])
-
-# Calculate the jonswap spectrum
 waves = calculateJONSWAPSpectrum(waves)
 
-
+# Calculate the wave kinematics from Irregular wave with FFT and without FFT
 with Timer("slow waves"):
     waves = calculateFreeSurfaceElevationTimeSeries(waves)
     waves = calculateKinematics(waves)
 
-# Now with FFT
-# FIXME Assignment 3 Q1.8: implement the FFT functions in waves.py
 with Timer("fast waves"):
     wavesFast = calculateFreeSurfaceElevationTimeSeriesFFT(waves)
     wavesFast = calculateKinematicsFFT(wavesFast)
+
+
    
-# Load the wind info
-wind = loadFromJSON(ss("wind4.json"))
+# WIND
+wind = loadFromJSON(get_input_file("wind4.json"))
 wind.update(timeInfo)
 
-randomWind = 11
+# Calculate the wind time series with FFT and without FFT
 with Timer("Slow wind"):
     wind = calculateWindTimeSeries(wind)
     
-# FIXME Assignment 3 Q1.8: implement the FFT functions in wind.py
 with Timer("Fast wind"):
     windFast = calculateWindTimeSeriesFFT(wind)    
 
 
+
+# ============================================================================
+# Plot the results
+# ============================================================================
 
 fig, axs = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
 
