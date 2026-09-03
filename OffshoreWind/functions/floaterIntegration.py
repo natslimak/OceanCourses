@@ -1,5 +1,6 @@
 from integration import lookup
 import numpy as np
+from scipy.integrate import trapezoid
 from loads import forceDistributed
 from rotor import *
 from bisect import bisect_left as lookup
@@ -37,8 +38,8 @@ def dqdt(t, q,
     
     u, ut = waves["u"][i_,:], waves["ut"][i_,:]
     df = forceDistributed(structure, u, ut, structure["z"], x_dot_submerged)
-    Fhydro = np.array([np.trapz(df, structure["z"]),
-                       np.trapz(df*structure["z"], structure["z"])])
+    Fhydro = np.array([trapezoid(df, structure["z"]),
+                       trapezoid(df*structure["z"], structure["z"])])
     
     output = np.zeros(5)
     output[0:2] = xdot1

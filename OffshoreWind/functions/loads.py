@@ -7,6 +7,7 @@ Author: Fabio Pierella
 Copyright (c) 2024 DTU Wind and Energy Systems
 '''
 import numpy as np
+from scipy.integrate import trapezoid
 from rotor import *
 from monopile import forceDistributed
 
@@ -59,8 +60,8 @@ def calculateStaticWaveLoads(waves, structure, q):
         #df = np.zeros_like(zSubmerged)
         df = forceDistributed(structure, u, ut, z, x_dot_submerged[i_])
         
-        F_with_rel_motion[i_] = np.trapz(df, zSubmerged)
-        M_with_rel_motion[i_] = np.trapz(df*(zSubmerged+h), zSubmerged)
+        F_with_rel_motion[i_] = trapezoid(df, zSubmerged)
+        M_with_rel_motion[i_] = trapezoid(df*(zSubmerged+h), zSubmerged)
 
     # Output dictionary
     outputDict = dict()
