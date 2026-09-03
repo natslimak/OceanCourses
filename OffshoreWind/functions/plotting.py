@@ -12,34 +12,36 @@ def makeplots(wind, waves, structure, response, timeInfo, color, **kwargs):
     Filter = wind["t"] > timeInfo["TTrans"]
     FilterResponse = response["t"] > timeInfo["TTrans"]
 
-    ax[0,0].plot(wind["t"], wind["V_hub"], color=color)
-    ax[0,0].set_ylabel("V[m/s]")
+    ax[0,0].plot(wind["t"], wind["V_hub"], color=color, linewidth=2.5)
+    ax[0,0].set_ylabel(r"V [$m/s$]", fontsize=10)
+    ax[0,0].tick_params(labelsize=10)
     
     f, _, S = freqSpectrum(wind["t"], wind["V_hub"])
-    ax[0,1].plot(f, S, color=color)
-    ax[0,1].set_ylabel("PSD [m^2/s^2 / Hz]")
+    ax[0,1].plot(f, S, color=color, linewidth=2.5)
+    ax[0,1].set_ylabel(r"PSD [$m^2/s^2 / Hz$]", fontsize=10)
+    ax[0,1].tick_params(labelsize=10)
     
     ax[1,0].plot(waves["t"], waves["eta"], color=color)
-    ax[1,0].set_ylabel("eta[m]")
+    ax[1,0].set_ylabel(r"$\eta$ [$m$]", fontsize=10)
     
     f, _, S = freqSpectrum(waves["t"],  waves["eta"])
     ax[1,1].plot(f, S, color=color)
-    ax[1,1].set_ylabel("PSD [m^2 / Hz]")    
+    ax[1,1].set_ylabel(r"PSD [$m^2 / Hz$]", fontsize=10)    
 
     ax[2,0].plot(response["t"], response["x1"], color=color)
-    ax[2,0].set_ylabel("surge[m]")
+    ax[2,0].set_ylabel(r"Surge [$m$]", fontsize=10)
     
     f, _, S = freqSpectrum(response["t"][FilterResponse], response["x1"][FilterResponse])
     ax[2,1].plot(f, S, color=color)
-    ax[2,1].set_ylabel("PSD [m^2 / Hz]")    
+    ax[2,1].set_ylabel(r"PSD [$m^2 / Hz$]", fontsize=10)    
     ax[2,1].axvline(structure["fnat"][0], 0., np.max(S), color='k', linestyle='--',label='_nolegend_')
 
     ax[3,0].plot(response["t"], np.rad2deg(response["x5"]), color=color)    
-    ax[3,0].set_ylabel("pitch[rad]")
+    ax[3,0].set_ylabel(r"Pitch [rad]", fontsize=10)
     
     f, _, S = freqSpectrum(response["t"][FilterResponse], response["x5"][FilterResponse])
     ax[3,1].plot(f, S, color=color)
-    ax[3,1].set_ylabel("PSD [rad^2 / Hz]")
+    ax[3,1].set_ylabel(r"PSD [rad^2 / Hz]", fontsize=10)
     ax[3,1].axvline(structure["fnat"][1], 0., np.max(S), color='k', linestyle='--',label='_nolegend_')
     
     ax[3,1].set_xlim([0., timeInfo["fHighCut"]])
@@ -133,3 +135,53 @@ def freqSpectrum(t, x, flagMean=False):
         return f, a, S
         
         
+def recolor_lines_by_time(fig, t_split=600.0, color_before='red', color_after='blue'):
+    """
+    Recolor plotted lines in the left column of a figure grid based on a time split.
+    
+    Parameters:
+    -----------
+    fig : numpy array of axes
+        Figure axes array (typically 4x2)
+    t_split : float
+        Time value at which to split colors (default: 600.0 seconds)
+    color_before : str
+        Color for data before t_split (default: 'red')
+    color_after : str
+        Color for data after t_split (default: 'blue')
+    """
+    axs = np.array(fig)
+    left_col = axs[:, 0].ravel()
+    
+    for ax in left_col:
+        orig_lines = list(ax.get_lines())
+        for line in orig_lines:
+            x = np.asarray(line.get_xdata())
+            y = np.asarray(line.get_ydata())
+            if x.size == 0:
+                continue
+
+            mask1 = x <= t_split
+            mask2 = x > t_split
+
+            lw = line.get_linewidth()
+            ls = line.get_linestyle()
+            mk = line.get_marker()
+            msz = line.get_markersize()
+            alpha = line.get_alpha()
+            orig_label = line.get_label()
+
+            if mask1.any():
+                label1 = orig_label if (mask1.any() and not mask2.any()) else None
+                ax.plot(x[mask1], y[mask1], color=color_before, linewidth=lw, linestyle=ls, 
+                       marker=mk, markersize=msz, alpha=alpha, label=label1)
+
+            if mask2.any():
+                label2 = orig_label if (mask2.any() and not mask1.any()) else None
+                ax.plot(x[mask2], y[mask2], color=color_after, linewidth=lw, linestyle=ls, 
+                       marker=mk, markersize=msz, alpha=alpha, label=label2)
+
+            try:
+                line.remove()
+            except Exception:
+                pass

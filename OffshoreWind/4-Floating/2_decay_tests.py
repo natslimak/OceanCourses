@@ -44,18 +44,6 @@ IEA22MWRotor["ARotor"] = 0.25 * np.pi * IEA22MWRotor["DRotor"]**2
 IEA22MWRotor["gamma"] = 0.              # Controller parameter
 IEA22MWRotor["active"] = False          # State of the rotor
 
-
-# ============================================================================
-# Decay Tests
-# ============================================================================
-#%%  DRY DECAY -> The drag coefficient is set to zero.
-#    - no Morison drag force
-#    - no viscous damping
-#    - only restoring forces remain
-
-# Set the drag coefficient to zero for dry decay
-SparBuoyData["CD"] = 0
-
 # Wave kinematics - should be zero
 waves = loadFromJSON(get_input_file("nowaves.json"))
 waves["z"] = z
@@ -75,6 +63,18 @@ waves["eta"] = np.zeros(len(waves["t"]))
 
 # Integration time array
 tode = np.arange(0., timeInfo["TDur"], 2*timeInfo["dt"])
+
+
+# ============================================================================
+# Decay Tests
+# ============================================================================
+#%%  DRY DECAY -> The drag coefficient is set to zero.
+#    - no Morison drag force
+#    - no viscous damping
+#    - only restoring forces remain
+
+# Set the drag coefficient to zero for dry decay
+SparBuoyData["CD"] = 0
 
 
 # ------ Initial conditions for surge decay -------
