@@ -175,15 +175,52 @@ f_w = max(f_w_lam, f_w_smooth, f_w_rough)
 # Calculate the friction velocity for the waves
 U_fw = np.sqrt(f_w / 2) * U_m 
 
-# Shields parameter for the waves
-theta_w = U_fw ** 2 / (g * d50 * (s - 1))
-theta_c = U_fc ** 2 / (g * d50 * (s - 1))
+# Shields parameter 
+theta_w = U_fw ** 2 / (g * d50 * (s - 1))          # For the waves
+theta_c = U_fc ** 2 / (g * d50 * (s - 1))          # For the current
+
+# Increased mean bed shear stress
+theta_m = theta_c * (1 + 1.2 *(theta_w / (theta_c+theta_w)**(3/2)))
+
+# Maximum combined shields parameter
+theta_cw = theta_m + theta_w
+
+# Friction velocity for the combined waves and current
+U_fcw = np.sqrt(theta_cw * g * d50 * (s - 1))
+
+# Reynolds number for the combined waves and current
+Re_cw = U_fcw * d50 / nu
 
 # Critical Shields parameter for initiation of motion
-###c_cr = 
+theta_cr_cw = 0.165 * (Re_cw + 0.6) ** (-0.8) + 0.045 * np.exp(-40 * (Re_cw ** (-1.3)))
 
-# Critical Shields parameter for initiation of motion under combined waves and current
-#c_cw = 
+# Velocities in the middle of the pipe??????????
+#FIXME
+z_mid = D / 2 - e 
+U_c_mid = U_fc / kappa * np.log(30 * z_mid / ks)
+U_m_mid = (Hs / (2 * np.sqrt(2))) * np.sqrt(g/h) * np.exp(-((3.65/Tz) * np.sqrt(h/g))**2.1)
 
-# 
-#gamma = 1 +200 * (theta_cw - theta_cr) ** 3/2
+# m parameter 
+m = U_c_mid / U_m_mid + U_c_mid
+
+# Gamma parameter
+big_gamma = 1 +200 * (theta_cw - theta_cr_cw) ** 3/2
+
+# Gamma parameter
+if m < 0.2: 
+    small_gamma = 0.3
+else: 
+    small_gamma = 5.3 * np.exp(-2.96 * (m - 1.75) ** 2) + 6.1 * np.exp(-5.25 * (m + 0.56) ** 2)
+
+# Big Lambda
+big_lambda = np.exp(-3.2 * (e / D))
+
+# Dimensionless primary migration speed of the scour hole
+V_h_star = 3 * big_gamma * big_lambda * small_gamma
+
+# Actual primary migration speed of the scour hole
+V_h = (V_h_star * np.sqrt(g * (s - 1) * d50)) * (d50 / D)
+
+# Print the results
+print('\nResults for Primary Migration Speed of the Scour Hole:')
+print(f'Velocity of the scour hole: {V_h:.4f} m/s')
