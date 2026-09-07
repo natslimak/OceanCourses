@@ -25,6 +25,8 @@ V = 1.1             # Depth-averaged current velocity [m/s]
 Tp = 9.0            # Peak wave period [s]
 Hs = 4.0            # Significant wave height [m]
 
+# Engineering parameters
+nu = 1e-6           # Kinematic viscosity of water [m^2/s]
 
 
 
@@ -38,7 +40,7 @@ z = D - e
 # Define a range of burial ratios to plot the onset criteria as curves
 ratios = np.geomspace(1e-3, 1, 200)
 
-# Get the friction velocity
+# Get the friction velocity in current flow
 U_fc = V / (6 + (1/kappa) * np.log(h/ks))
 
 # Get the velocity at the given depth
@@ -88,26 +90,14 @@ print('Onset scour status: ', 'Yes' if onset_scour > 1 else 'No')
 # TASK 1b: Onset Scour - Waves
 # ======================================================================
 
-# Get the initial guess for the wavenumber 
-omega = 2 * np.pi / Tp        # (1/s) Wave angular frequency
-k0 = omega**2 / g             # Initial guess for wavenumber
-
-# Solve dispersion relation using the initial guess
-func = lambda k0: omega**2 - g * k0 * np.tanh(k0 * D)
-k = fsolve(func, k0)
-k = k[0]
-
-# Calculate the wavelength
-L = 2 * np.pi / k     
-
 # Zero-crossing wave period
 Tz = Tp / 1.3
 
 # Free stream velocity at the top of the pipeline
-U_m = Hs / 2 * np.sqrt(2) * np.sqrt(g/h) * np.exp(-(3.65/Tz * np.sqrt(g/h))**2.1)
+U_m = (Hs / (2 * np.sqrt(2))) * np.sqrt(g/h) * np.exp(-((3.65/Tz) * np.sqrt(h/g))**2.1)
 
 # Calculate the onset criteria
-L_side_w = U_m **2 / g * D * (s - 1) * (1 - n)
+L_side_w = U_m **2 / (g * D * (s - 1) * (1 - n))
 R_side_w = lambda ratio: 0.025 * np.exp(9 * np.sqrt(ratio)) # ratio = e / D
 
 # Get the KC number
@@ -165,3 +155,35 @@ plt.grid(True, which='both', alpha=0.3, linestyle='-', linewidth=0.5)
 plt.tight_layout()
 plt.show()
 
+
+# ======================================================================
+# TASK 2: Primary Migration Speed of the Scour Hole
+# ======================================================================
+# Orbital wave amplitude
+a = U_m * Tp / (2 * np.pi)
+
+# Calculate the Reynolds number for the waves
+Re_w = U_m * a / nu  
+
+# Friction coefficient for the waves
+f_w_lam = 2 / (np.sqrt(Re_w))                       # Laminar flow
+f_w_smooth = 0.04 * Re_w ** (-0.16)                 # Smooth turbulent flow
+f_w_rough = np.exp(5.5 * (a/ks) ** (-0.16) - 6.7)   # Rough turbulent flow
+
+f_w = max(f_w_lam, f_w_smooth, f_w_rough)
+
+# Calculate the friction velocity for the waves
+U_fw = np.sqrt(f_w / 2) * U_m 
+
+# Shields parameter for the waves
+theta_w = U_fw ** 2 / (g * d50 * (s - 1))
+theta_c = U_fc ** 2 / (g * d50 * (s - 1))
+
+# Critical Shields parameter for initiation of motion
+###c_cr = 
+
+# Critical Shields parameter for initiation of motion under combined waves and current
+#c_cw = 
+
+# 
+#gamma = 1 +200 * (theta_cw - theta_cr) ** 3/2
