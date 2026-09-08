@@ -1,13 +1,17 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.optimize import fsolve
 
 
+# ======================================================================
+# Given data
+# ======================================================================
 # Constants
-rho = 1000          # Water density [kg/m^3]
+rho = 1026          # Water density [kg/m^3]
 rho_s = 2650        # Sediment density [kg/m^3]
 g = 9.81            # Gravitational acceleration [m/s^2]
 kappa = 0.4         # von Karman constant [-]
+nu = 1e-6           # Kinematic viscosity of water [m^2/s]
+s = rho_s / rho     # Relative density of sediment [-]
 
 # Given parameters
 n = 0.43            # Porosity [-]
@@ -16,7 +20,6 @@ D = 0.8             # Diameter of the pipeline [m]
 e = 0.04            # Initial Burial Depth [m]
 h = 15.0            # Water depth [m]
 ks = 2.5 * d50      # Roughness height [m]
-s = 2.65            # Relative density of sediment [-]
 
 # Spring tide current velocity properties
 V = 1.1             # Depth-averaged current velocity [m/s]
@@ -24,9 +27,6 @@ V = 1.1             # Depth-averaged current velocity [m/s]
 # Dominant wave properties
 Tp = 9.0            # Peak wave period [s]
 Hs = 4.0            # Significant wave height [m]
-
-# Engineering parameters
-nu = 1e-6           # Kinematic viscosity of water [m^2/s]
 
 
 
@@ -82,7 +82,7 @@ dp_dx = - rho * U ** 2 / (D * f)
 onset_scour = np.abs(dp_dx) / (g * rho * (s-1) * (1-n))
 
 print('\nOnset scour occursif pressure gradient / (g * rho * (s-1) * (1-n)) > 1:')
-print(f'Onset scour value: {onset_scour:.2f}')   # His value: 0.65
+print(f'Onset scour value: {onset_scour:.2f}') 
 print('Onset scour status: ', 'Yes' if onset_scour > 1 else 'No')
 
 
@@ -102,58 +102,6 @@ R_side_w = lambda ratio: 0.025 * np.exp(9 * np.sqrt(ratio)) # ratio = e / D
 
 # Get the KC number
 KC = U_m * Tp / D
-func_KC = lambda D: U_m * Tp / D
-
-# Plot the data
-plt.figure(figsize=(8, 4), dpi=150)
-plt.plot(ratios, R_side_w(ratios), label=r'$R_{side}$', color='red', linewidth=2)
-plt.plot(e / D, L_side_w, 'o', label='Onset Scour', color='blue', markersize=7)
-plt.xscale('log')
-plt.yscale('log')
-plt.ylim(1e-3, 1)
-plt.gca().xaxis.set_major_formatter(plt.matplotlib.ticker.StrMethodFormatter('{x:.2g}'))
-plt.gca().yaxis.set_major_formatter(plt.matplotlib.ticker.StrMethodFormatter('{x:.2g}'))
-plt.xlabel(r'$e/D$', fontsize=12)
-plt.ylabel(r'$\frac{U_{m}^{2}}{gD(s-1)(1-n)}$', rotation=90, labelpad=16, fontsize=12)
-plt.title('Onset Scour: Waves', fontsize=14)
-plt.legend(frameon=True, fancybox=True, framealpha=0.9, loc='upper right')
-plt.grid(True, which='both', alpha=0.3, linestyle='-', linewidth=0.5)
-plt.tight_layout()
-plt.show()
-
-# Get the results
-print('Results for Onset Scour - Waves:')
-print(f'L_side_w: {L_side_w:.4f}', '   ', f'R_side_w: {R_side_w(e / D):.4f}')
-print('\nOnset scour occursif L_side_w > R_side_w:')
-print(f'Value of L_side / R_side: {L_side_w / R_side_w(e / D):.4f}')
-print('Onset scour status: ', 'Yes' if L_side_w > R_side_w(e / D) else 'No')
-
-
-
-# ======================================================================
-# Plotting 
-# ======================================================================
-
-# Plot together on one plot both curves
-plt.figure(figsize=(8, 4), dpi=150)
-# Steady current
-plt.plot(ratios, R_side_c(ratios), label=r'$R_{side}$ (Steady Current)', color='red', linewidth=2)
-plt.plot(e / D, L_side_c, 'o', label='Onset Scour (Steady Current)', color='blue', markersize=7)
-# Waves
-plt.plot(ratios, R_side_w(ratios), label=r'$R_{side}$ (Waves)', color='orange', linewidth=2)
-plt.plot(e / D, L_side_w, 'o', label='Onset Scour (Waves)', color='green', markersize=7)
-plt.xscale('log')
-plt.yscale('log')
-plt.ylim(1e-3, 1)
-plt.gca().xaxis.set_major_formatter(plt.matplotlib.ticker.StrMethodFormatter('{x:.2g}'))
-plt.gca().yaxis.set_major_formatter(plt.matplotlib.ticker.StrMethodFormatter('{x:.2g}'))
-plt.xlabel(r'$e/D$', fontsize=12)
-plt.ylabel(r'$\frac{U^{2}}{gD(s-1)(1-n)}$', rotation=90, labelpad=16, fontsize=12)
-plt.title('Onset Scour: Steady Current vs Waves', fontsize=14)
-plt.legend(frameon=True, fancybox=True, framealpha=0.9, loc='upper right')
-plt.grid(True, which='both', alpha=0.3, linestyle='-', linewidth=0.5)
-plt.tight_layout()
-plt.show()
 
 
 # ======================================================================
@@ -221,6 +169,11 @@ V_h_star = 3 * big_gamma * big_lambda * small_gamma
 # Actual primary migration speed of the scour hole
 V_h = (V_h_star * np.sqrt(g * (s - 1) * d50)) * (d50 / D)
 
+# Time 
+# FIXME
+t_100 = 100 * D / 2 * V_h
+
 # Print the results
 print('\nResults for Primary Migration Speed of the Scour Hole:')
 print(f'Velocity of the scour hole: {V_h:.4f} m/s')
+print(f'Time for the scour hole to reach 100D: {t_100:.2f} s')
