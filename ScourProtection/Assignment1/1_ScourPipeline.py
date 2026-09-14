@@ -179,5 +179,77 @@ print(f'Time for the scour hole to reach 100D: {t_100/3600:.2f} hours')
 
 
 # ======================================================================
-# TASK 3: Equilibrium Scour Profile
+# TASK 3: 2D Equilibrium Scour Profile
 # ======================================================================
+
+# === CASE 1: Waves ===
+S_eq_waves = 0.1 * np.sqrt(KC) * D
+W_waves = 0.35 * KC**0.65 * D
+
+print('\n2D Equilibrium Scour Profile - Waves:')
+print(f'Depth: {S_eq_waves:.2f} m')
+print(f'Width 1: {W_waves:.2f} m')
+print(f'Width 2: {W_waves:.2f} m')
+
+
+# === CASE 2: Steady Current ===
+S_eq_current = 0.6 * D
+W_1_current = 2 * D
+W_2_current = 4 * D
+
+print('\n2D Equilibrium Scour Profile - Current:')
+print(f'Depth: {S_eq_current:.2f} m')
+print(f'Width 1: {W_1_current:.2f} m')
+print(f'Width 2: {W_2_current:.2f} m')
+
+
+# === CASE 3: Tidal Current ===
+S_eq_tidal = 0.6 * D
+W_1_tidal = 4 * D
+W_2_tidal = 4 * D
+
+print('\n2D Equilibrium Scour Profile - Tidal Current:')
+print(f'Depth: {S_eq_tidal:.2f} m')
+print(f'Width 1: {W_1_tidal:.2f} m')
+print(f'Width 2: {W_2_tidal:.2f} m')
+
+
+# === CASE 4: Current + Waves ===
+
+# Calculate the a 
+if 0 <= m <= 0.4:
+    a_m = 0.557 - 0.912 * (m - 0.25) ** 2
+    b_m = -1.14 + 2.24 * (m - 0.25) ** 2
+elif 0.4 < m <= 0.7:
+    a_m = -2.14 * m + 1.46
+    b_m = 3.3 * m - 2.5
+
+# Calculate F 
+if 0 <= m <= 0.7:
+    F = (5/3) * (KC** a_m) * np.exp(2.3 * b_m)
+elif m > 0.7:
+    F = 1.0
+else:
+    raise ValueError("Invalid value of m")
+
+S_eq_current = 0.6 * D * F
+W_1_current = 1.9
+W_2_current = 3.8
+
+
+print('\n2D Equilibrium Scour Profile - Current + Waves:')
+print(f'Depth: {S_eq_current:.2f} m')
+print(f'Width 1: {W_1_current:.2f} m')
+print(f'Width 2: {W_2_current:.2f} m')
+
+
+
+# ======================================================================
+# TASK 4: Scour Depth Development 
+# ======================================================================
+
+# Non-dimensional time scale for current scour
+T_star = 1/50 * theta_c**(-5/3)
+
+# Dimensionless scour depth development
+T = D**2 / (np.sqrt(g * (s - 1) * d50**3)) * T_star
