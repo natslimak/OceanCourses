@@ -1,6 +1,6 @@
 # OceanCourses
 
-Repository for oceanography data analysis coursework using Python.
+Repository for all the take courses taken at DTU Ocean Engineering. 
 
 ## Setup
 
@@ -25,30 +25,6 @@ pip install --upgrade pip
 pip install numpy pandas netCDF4 matplotlib
 ```
 
-## Project Structure
-
-```
-OceanCourses/
-├── DigitalOcean/
-│   └── Assignment_1.ipynb    # Ocean data analysis notebook
-├── .ocean/                    # Virtual environment (ignored by git)
-├── .gitignore
-└── README.md
-```
-
-## Assignments
-
-### Assignment 1
-- Work with NetCDF ocean data files
-- Visualize temperature data (thetao) across depth, latitude, and longitude
-- Plot using matplotlib and analyze specific data vectors
-
-## Usage
-
-Open Jupyter notebooks in VS Code or run:
-```powershell
-jupyter notebook
-```
 
 ## Requirements
 
