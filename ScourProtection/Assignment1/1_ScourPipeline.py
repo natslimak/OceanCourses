@@ -183,35 +183,35 @@ print(f'Time for the scour hole to reach 100D: {t_100/3600:.2f} hours')
 # ======================================================================
 
 # === CASE 1: Waves ===
-S_eq_waves = 0.1 * np.sqrt(KC) * D
-W_waves = 0.35 * KC**0.65 * D
+S_eq_w = 0.1 * np.sqrt(KC) * D
+W_w = 0.35 * KC**0.65 * D
 
 print('\n2D Equilibrium Scour Profile - Waves:')
-print(f'Depth: {S_eq_waves:.2f} m')
-print(f'Width 1: {W_waves:.2f} m')
-print(f'Width 2: {W_waves:.2f} m')
+print(f'Depth: {S_eq_w:.2f} m')
+print(f'Width 1: {W_w:.2f} m')
+print(f'Width 2: {W_w:.2f} m')
 
 
 # === CASE 2: Steady Current ===
-S_eq_current = 0.6 * D
-W_1_current = 2 * D
-W_2_current = 4 * D
+S_eq_c = 0.6 * D
+W_1_c = 2 * D
+W_2_c = 4 * D
 
 print('\n2D Equilibrium Scour Profile - Current:')
-print(f'Depth: {S_eq_current:.2f} m')
-print(f'Width 1: {W_1_current:.2f} m')
-print(f'Width 2: {W_2_current:.2f} m')
+print(f'Depth: {S_eq_c:.2f} m')
+print(f'Width 1: {W_1_c:.2f} m')
+print(f'Width 2: {W_2_c:.2f} m')
 
 
 # === CASE 3: Tidal Current ===
-S_eq_tidal = 0.6 * D
-W_1_tidal = 4 * D
-W_2_tidal = 4 * D
+S_eq_t = 0.6 * D
+W_1_t = 4 * D
+W_2_t = 4 * D
 
 print('\n2D Equilibrium Scour Profile - Tidal Current:')
-print(f'Depth: {S_eq_tidal:.2f} m')
-print(f'Width 1: {W_1_tidal:.2f} m')
-print(f'Width 2: {W_2_tidal:.2f} m')
+print(f'Depth: {S_eq_t:.2f} m')
+print(f'Width 1: {W_1_t:.2f} m')
+print(f'Width 2: {W_2_t:.2f} m')
 
 
 # === CASE 4: Current + Waves ===
@@ -232,24 +232,57 @@ elif m > 0.7:
 else:
     raise ValueError("Invalid value of m")
 
-S_eq_current = 0.6 * D * F
-W_1_current = 1.9
-W_2_current = 3.8
+S_eq_cw = 0.6 * D * F
+W_1_cw = 1.9 * D
+W_2_cw = 3.8 * D
 
 
 print('\n2D Equilibrium Scour Profile - Current + Waves:')
-print(f'Depth: {S_eq_current:.2f} m')
-print(f'Width 1: {W_1_current:.2f} m')
-print(f'Width 2: {W_2_current:.2f} m')
+print(f'Depth: {S_eq_cw:.2f} m')
+print(f'Width 1: {W_1_cw:.2f} m')
+print(f'Width 2: {W_2_cw:.2f} m')
 
 
 
 # ======================================================================
 # TASK 4: Scour Depth Development 
 # ======================================================================
+print('\nScour Depth Development:')
+print(f'Scour depth - Current: {S_eq_c:.2f} m')
+print(f'Scour depth - Current + Waves: {S_eq_cw:.2f} m')
 
-# Non-dimensional time scale for current scour
-T_star = 1/50 * theta_c**(-5/3)
+# Climate parameters
+t_c = 14 * 3600           # Time of current action [s]
+t_w = 14 * 3600           # Time of wave action [s]
 
-# Dimensionless scour depth development
-T = D**2 / (np.sqrt(g * (s - 1) * d50**3)) * T_star
+
+# SCOUR IN CURRENT CONDITION
+T_star_c = 1/50 * theta_c**(-5/3)                           # Non-dimensional timescale 
+T_c = D**2 / (np.sqrt(g * (s - 1) * d50**3)) * T_star_c     # Dimensional timescale for scour development [s]
+S_tc = lambda t: S_eq_c * (1 - np.exp(-t/T_c))              # Dimensional scour depth development [m]
+S_tc_at_tc = S_tc(t_c)                                      # Scour depth at time t_c [m]   
+print(f'\nEvolution of scour after current action: {S_tc_at_tc:.2f} m')
+
+
+# SCOUR IN WAVE CONDITION WITH BACKFILLING -> S_eq_cw < S_tc_at_tc
+T_star_b = (1/50 + 0.015 * (np.exp(-350*(m-0.5)**2)+np.exp(-25*(m-0.53)**2))) * theta_cw**(-5/3)   # Non-dimensional timescale
+T_b = D**2 / (np.sqrt(g * (s - 1) * d50**3)) * T_star_b                                            # Dimensional timescale for scour development [s]
+S_tw = lambda t: S_eq_cw + (S_tc_at_tc - S_eq_cw) * np.exp(-t/T_b)                                 # Dimensional scour depth development [m]
+S_t_cw = S_eq_cw * (1 - np.exp(-t_w/T_b))                                                          # Dimensional scour depth development [m] after wave action
+print(f'\nEvolution of scour after wave action: {S_t_cw:.2f} m')
+
+
+# Initialize the time arrays for plotting
+current_time = np.linspace(0, t_c, 100)
+wave_time = np.linspace(0, t_w, 100)
+
+# Make the plot of the scour depth development
+plt.figure(figsize=(8, 4), dpi=150)
+plt.plot(current_time, S_tc(current_time), color='blue', linewidth=2, label='Steady Current')
+plt.plot(t_c + wave_time, S_tw(wave_time), color='red', linewidth=2, label='Waves Dominated')
+plt.xlabel('Time [s]', fontsize=12, labelpad=16) 
+plt.ylabel('Scour Depth [m]', rotation=90, labelpad=16, fontsize=12)
+plt.title('Timescale of the Scour Depth Development', fontsize=14)
+plt.ticklabel_format(axis='x', style='plain', useOffset=False)
+plt.legend()
+
