@@ -278,11 +278,11 @@ wave_time = np.linspace(0, t_w, 100)
 
 # Make the plot of the scour depth development
 plt.figure(figsize=(8, 4), dpi=150)
-plt.plot(current_time, S_tc(current_time), color='blue', linewidth=2, label='Steady Current')
-plt.plot(t_c + wave_time, S_tw(wave_time), color='red', linewidth=2, label='Waves Dominated')
+plt.plot(current_time, S_tc(current_time), color='blue', linewidth=2, label=r'$S_c(t)$ - Steady Current')
+plt.plot(t_c + wave_time, S_tw(wave_time), color='red', linewidth=2, label=r'$S_w(t)$ - Wave Dominant')
 plt.xlabel('Time [s]', fontsize=12, labelpad=16) 
 plt.ylabel('Scour Depth [m]', rotation=90, labelpad=16, fontsize=12)
-plt.title('Timescale of the Scour Depth Development', fontsize=14)
+#plt.title('Timescale of the Scour Depth Development', fontsize=14)
 plt.ticklabel_format(axis='x', style='plain', useOffset=False)
 plt.legend()
 
