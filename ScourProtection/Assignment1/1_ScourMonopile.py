@@ -19,9 +19,8 @@ s = rho_s / rho     # Relative density of sediment [-]
 n = 0.43            # Porosity [-]
 d50 = 0.2e-3        # Median grain size [m]
 delta_g = 2.3       # Geometric standard deviation of sediment [-]
-D = 0.9             # Diameter of the monopile [m]
-e = 0.04            # Initial Burial Depth [m]
-h = 15.0            # Water depth [m]
+D = 9.0             # Diameter of the monopile [m]
+h = 30.0            # Water depth [m]
 ks = 2.5 * d50      # Roughness height [m]
 
 # Sea_state conditions
@@ -39,7 +38,7 @@ Tp_storm = 14.0     # Peak wave period in storm conditions [s]
 
 
 # ======================================================================
-# TASK 1: Estimate KC, 𝑈_cw , D/L and 𝜃_cw for all conditions
+# TASK 5: Estimate KC, 𝑈_cw , D/L and 𝜃_cw for all conditions
 # ======================================================================
 
 def get_details(V, Hs, Tp, h=h, D=D):
@@ -96,6 +95,8 @@ def get_details(V, Hs, Tp, h=h, D=D):
     # Maximum combined shields parameter
     theta_cw = theta_m + theta_w
 
+    # 
+
     return KC_c, KC_w, KC_tot, U_cw, DL_ratio, theta_cw
 
 
@@ -117,3 +118,58 @@ summary_table.add_rows([
 
 print("\nSummary of Scour Parameters")
 print(summary_table)
+
+
+# ==========================================================================
+# TASK 6: Estimate equilibrium scour depth for all conditions and time-scale
+# ==========================================================================
+
+def estimate_scour_depth_and_time_scale(U_cw, KC, DL_ratio, theta_cw):
+    S_max = 1.3 * D
+    A = 0.03 + 8 * U_cw ** (1/(max(KC,0.5))+5)
+    B = (6-5.8 * np.tanh(200*((DL_ratio)**1.9)))*np.exp(-4.7* U_cw)
+    S_eq = S_max * (1 - np.exp(-A*(max(KC,0.5) - B)))
+
+    # Scouring time scale
+    psi = 8 * 10**-5 * KC **2.5
+    omega = 1/375 * (h/D)**0.75
+
+    # Set up conditions
+    if KC < 4:
+        KC = 4
+
+    if U_cw < 0.44:
+        ratio_T_star_s_theta = psi * ((0.18 / psi)**(1/0.44))**U_cw  
+        T_star_s = psi * ((0.18 / psi)**(1/0.44))**U_cw * theta_cw**(-3/2)   # Non-dimensional timescale
+    else: 
+        ratio_T_star_s_theta = omega * U_cw ** (np.log(0.18 / omega) / np.log(0.44))
+        T_star_s = omega * U_cw ** (np.log(0.18 / omega) / np.log(0.44)) * theta_cw**(-3/2)   # Non-dimensional timescale
+
+    T_s = D**2 / (np.sqrt(g*(s-1)*d50**3)) * T_star_s
+
+    # Backfilling time scale
+    T_star_b = (1/50 + 0.015 * (np.exp(-350*(U_cw-0.5)**2)+np.exp(-25*(U_cw-0.53)**2))) * theta_cw**(-5/3)   # Non-dimensional timescale
+    T_b = D**2 / (np.sqrt(g * (s - 1) * d50**3)) * T_star_b  
+
+    return S_eq, ratio_T_star_s_theta, T_star_s, T_s, T_star_b, T_b, KC
+
+
+
+
+
+
+S_eq_calm, ratio_T_star_s_theta_calm, T_star_calm, T_calm, T_star_b_calm, T_b_calm, KC_used_calm = estimate_scour_depth_and_time_scale(U_cw_calm, KC_tot_calm, DL_ratio_calm, theta_cw_calm)
+S_eq_norm, ratio_T_star_s_theta_norm, T_star_norm, T_norm, T_star_b_norm, T_b_norm, KC_used_norm = estimate_scour_depth_and_time_scale(U_cw_norm, KC_tot_norm, DL_ratio_norm, theta_cw_norm)
+S_eq_storm, ratio_T_star_s_theta_storm, T_star_storm, T_storm, T_star_b_storm, T_b_storm, KC_used_storm = estimate_scour_depth_and_time_scale(U_cw_storm, KC_tot_storm, DL_ratio_storm, theta_cw_storm)
+
+scour_table = pt.PrettyTable()
+scour_table.field_names = ["Condition", "Ratio T*_s/θ", "KC", "S_eq (m)", "T_star", "Time scale (s)"]
+scour_table.align["Condition"] = "l"
+scour_table.add_rows([
+    ["Calm", f"{ratio_T_star_s_theta_calm:.2f}", f"{KC_used_calm:.2f}", f"{S_eq_calm:.2f}", f"{T_star_calm:.2e}", f"{T_calm:.2f}"],
+    ["Normal", f"{ratio_T_star_s_theta_norm:.2f}", f"{KC_used_norm:.2f}", f"{S_eq_norm:.2f}", f"{T_star_norm:.2e}", f"{T_norm:.2f}"],
+    ["Storm", f"{ratio_T_star_s_theta_storm:.2f}", f"{KC_used_storm:.2f}", f"{S_eq_storm:.2f}", f"{T_star_storm:.2e}", f"{T_storm:.2f}"],
+])
+
+print("\nEstimated Equilibrium Scour Depths and Time Scales")
+print(scour_table)
