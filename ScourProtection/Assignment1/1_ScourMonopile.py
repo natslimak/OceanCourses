@@ -42,6 +42,7 @@ Tp_storm = 14.0     # Peak wave period in storm conditions [s]
 # ======================================================================
 
 def get_details(V, Hs, Tp, h=h, D=D):
+    """Calculate the KC numbers, U_cw, D/L ratio and theta_cw for a given set of conditions."""
 
     # === Calculate the the KC numbers ===
     Tz = Tp / 1.3
@@ -123,6 +124,7 @@ print(summary_table)
 # ==========================================================================
 
 def estimate_scour_depth_and_time_scale(U_cw, KC, DL_ratio, theta_cw):
+    """Estimate the equilibrium scour depth and time-scale for a given set of conditions."""
     S_max = 1.3 * D
     A = 0.03 + 8 * U_cw ** (1/(max(KC,0.5))+5)
     B = (6-5.8 * np.tanh(200*((DL_ratio)**1.9)))*np.exp(-4.7* U_cw)
@@ -190,3 +192,132 @@ print(scour_table)
 # ==========================================================================
 # TASK 7: Scour Development 
 # ==========================================================================
+
+def scour_development(t, S_eq, T_s):
+    """Predict scour depth after installation while the pile is unprotected."""
+    return S_eq * (1 - np.exp(-t / T_s))
+
+
+conditions = {
+    "Calm": (S_eq_calm, T_calm, "tab:blue"),
+    "Normal": (S_eq_norm, T_norm, "tab:orange"),
+    "Storm": (S_eq_storm, T_storm, "tab:red"),
+}
+
+# Making a common time axis long enough to show the development of every case
+t_plot = np.linspace(0, 5 * max(T_calm, T_norm, T_storm), 400)
+
+plt.figure(figsize=(8, 4.5), dpi=150)
+for condition, (S_eq, T_s, colour) in conditions.items():
+    plt.plot(
+        t_plot / 3600,
+        scour_development(t_plot, S_eq, T_s) / D,
+        color=colour,
+        linewidth=2,
+        label=condition,
+    )
+
+plt.xlabel("Time after monopile installation [hours]")
+plt.ylabel("$S/D$")
+plt.title("Predicted scour development before scour protection")
+plt.grid(True, alpha=0.3)
+plt.legend(title="Flow condition")
+plt.tight_layout()
+plt.show()
+
+
+# ==========================================================================
+# TASK 8a: Depth averaged velocity over a 14 day period in Tidal Conditions
+# ==========================================================================
+V_sc  = 0.7     # Depth-averaged spring current [m/s]
+V_nc = 0.5      # Depth-averaged neap current [m/s]
+V_oc = 0.46     # Depth-averaged offset current [m/s]
+
+T_ebb_flood = 12.5              # Ebb/flood current oscillation period [hours]
+T_spring_neap = 14 * 24         # Spring/neap current oscillation period [hours]
+
+# Current oscillation amplitudes from the spring, neap, and offset currents.
+a_ebb_flood = (V_sc + V_nc) / 2 - V_oc
+a_spring_neap = (V_sc - V_nc) / 2
+
+
+def tidal_velocity(t):
+    """Return depth-averaged tidal velocity at time t [hours]."""
+    ebb_flood = a_ebb_flood * (2 * np.abs(np.cos(2 * np.pi * t / T_ebb_flood)) - 1)
+    spring_neap = a_spring_neap * np.cos(2 * np.pi * t / T_spring_neap)
+    return V_oc + ebb_flood + spring_neap
+
+
+t_tidal = np.linspace(0, T_spring_neap, 2000) # make a time array 
+velocity_tidal = tidal_velocity(t_tidal)
+
+plt.figure(figsize=(8, 4.5), dpi=150)
+plt.plot(t_tidal / 24, velocity_tidal, color="tab:blue", linewidth=1.2)
+plt.xlabel("Time [days]")
+plt.ylabel("Depth-averaged velocity, $V_c(t)$ [m/s]")
+plt.title("Depth-averaged tidal velocity over 14 days")
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()
+
+print("\nTask 8: Tidal velocity parameters")
+print(f"Ebb/flood amplitude: {a_ebb_flood:.3f} m/s")
+print(f"Spring/neap amplitude: {a_spring_neap:.3f} m/s")
+
+
+# ==========================================================================
+# TASK 8b: Depth averaged velocity to predict scour development
+# ==========================================================================
+
+# For current-only flow, use the current-scour equilibrium depth and update
+# the scour time scale with the instantaneous tidal velocity.
+S_eq_current = 0.6 * D
+
+def current_scour_time_scale(velocity):
+    """Return the current-only scour time scale for velocity [m/s] in hours."""
+    friction_velocity = velocity / (6 + (1 / kappa) * np.log(h / ks))
+    theta_current = friction_velocity**2 / (g * d50 * (s - 1))
+    T_star_current = (1 / 50) * theta_current**(-5 / 3)
+    T_current = D**2 / np.sqrt(g * (s - 1) * d50**3) * T_star_current
+    return T_current / 3600
+
+
+def integrate_scour(t_end, dt=0.25):
+    """Integrate dS/dt = (S_eq - S) / T_s(V_c(t)) from zero scour."""
+    time = np.arange(0, t_end + dt, dt)
+    scour = np.zeros_like(time)
+
+    for index in range(1, len(time)):
+        velocity = tidal_velocity(time[index - 1])
+        time_scale = current_scour_time_scale(velocity)
+        scour[index] = S_eq_current + (scour[index - 1] - S_eq_current) * np.exp(-dt / time_scale)
+
+    return time, scour
+
+
+t_week, scour_week = integrate_scour(7 * 24)
+t_four_months, scour_four_months = integrate_scour(4 * 30 * 24)
+
+fig, axes = plt.subplots(2, 1, figsize=(8, 6), dpi=150, sharey=True)
+axes[0].plot(t_week, scour_week / D, color="tab:green", linewidth=1.5)
+axes[0].set_title("Current-only scour development over one week")
+axes[0].set_xlabel("Time [hours]")
+axes[0].set_ylabel("Scour depth, $S/D$")
+axes[0].grid(True, alpha=0.3)
+
+axes[1].plot(t_four_months / 24, scour_four_months / D, color="tab:purple", linewidth=1.5)
+axes[1].set_title("Current-only scour development over four months")
+axes[1].set_xlabel("Time [days]")
+axes[1].set_ylabel("Scour depth, $S/D$")
+axes[1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+
+print("\nTask 8b: Current-only scour development")
+print(f"Equilibrium scour depth: {S_eq_current:.2f} m")
+print(f"Scour after one week: {scour_week[-1]:.2f} m ({scour_week[-1] / D:.3f}D)")
+print(
+    f"Scour after four months: {scour_four_months[-1]:.2f} m "
+    f"({scour_four_months[-1] / D:.3f}D)"
+)
