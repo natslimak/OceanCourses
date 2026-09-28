@@ -99,18 +99,18 @@ def get_details(V, Hs, Tp, h=h, D=D):
 
 
 # Calculate the details for calm, normal, and storm conditions
-KC_c_calm,  U_cw_calm, DL_ratio_calm, theta_cw_calm = get_details(V_calm, Hs_calm, Tp_calm)
-KC_c_norm, U_cw_norm, DL_ratio_norm, theta_cw_norm = get_details(V_norm, Hs_norm, Tp_norm)
-KC_c_storm, U_cw_storm, DL_ratio_storm, theta_cw_storm = get_details(V_storm, Hs_storm, Tp_storm)
+KC_calm,  U_cw_calm, DL_ratio_calm, theta_cw_calm = get_details(V_calm, Hs_calm, Tp_calm)
+KC_norm, U_cw_norm, DL_ratio_norm, theta_cw_norm = get_details(V_norm, Hs_norm, Tp_norm)
+KC_storm, U_cw_storm, DL_ratio_storm, theta_cw_storm = get_details(V_storm, Hs_storm, Tp_storm)
 
 # Make a summary table with the results
 summary_table = pt.PrettyTable()
 summary_table.field_names = ["Condition", "KC", "U_cw", "D/L", "theta_cw",]
 summary_table.align["Condition"] = "l"
 summary_table.add_rows([
-    ["Calm", f"{KC_c_calm:.2f}", f"{U_cw_calm:.2f}", f"{DL_ratio_calm:.5f}", f"{theta_cw_calm:.2f}"],
-    ["Normal", f"{KC_c_norm:.2f}", f"{U_cw_norm:.2f}", f"{DL_ratio_norm:.5f}", f"{theta_cw_norm:.2f}"],
-    ["Storm", f"{KC_c_storm:.2f}", f"{U_cw_storm:.2f}", f"{DL_ratio_storm:.5f}", f"{theta_cw_storm:.2f}"],
+    ["Calm", f"{KC_calm:.2f}", f"{U_cw_calm:.2f}", f"{DL_ratio_calm:.5f}", f"{theta_cw_calm:.2f}"],
+    ["Normal", f"{KC_norm:.2f}", f"{U_cw_norm:.2f}", f"{DL_ratio_norm:.5f}", f"{theta_cw_norm:.2f}"],
+    ["Storm", f"{KC_storm:.2f}", f"{U_cw_storm:.2f}", f"{DL_ratio_storm:.5f}", f"{theta_cw_storm:.2f}"],
 
 ])
 
@@ -167,9 +167,9 @@ def estimate_scour_depth_and_time_scale(U_cw, KC, DL_ratio, theta_cw):
 
 
 # Print the results
-S_eq_calm, T_star_calm, T_calm, T_star_b_calm, T_b_calm, KC_used_calm = estimate_scour_depth_and_time_scale(U_cw_calm, KC_w_calm, DL_ratio_calm, theta_cw_calm)
-S_eq_norm, T_star_norm, T_norm, T_star_b_norm, T_b_norm, KC_used_norm = estimate_scour_depth_and_time_scale(U_cw_norm, KC_w_norm, DL_ratio_norm, theta_cw_norm)
-S_eq_storm, T_star_storm, T_storm, T_star_b_storm, T_b_storm, KC_used_storm = estimate_scour_depth_and_time_scale(U_cw_storm, KC_w_storm, DL_ratio_storm, theta_cw_storm)
+S_eq_calm, T_star_calm, T_calm, T_star_b_calm, T_b_calm, KC_used_calm = estimate_scour_depth_and_time_scale(U_cw_calm, KC_calm, DL_ratio_calm, theta_cw_calm)
+S_eq_norm, T_star_norm, T_norm, T_star_b_norm, T_b_norm, KC_used_norm = estimate_scour_depth_and_time_scale(U_cw_norm, KC_norm, DL_ratio_norm, theta_cw_norm)
+S_eq_storm, T_star_storm, T_storm, T_star_b_storm, T_b_storm, KC_used_storm = estimate_scour_depth_and_time_scale(U_cw_storm, KC_storm, DL_ratio_storm, theta_cw_storm)
 
 # Put them into a nice table 
 scour_table = pt.PrettyTable()
