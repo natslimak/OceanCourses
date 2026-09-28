@@ -95,8 +95,6 @@ def get_details(V, Hs, Tp, h=h, D=D):
     # Maximum combined shields parameter
     theta_cw = theta_m + theta_w
 
-    # 
-
     return KC_c, KC_w, KC_tot, U_cw, DL_ratio, theta_cw
 
 
@@ -130,13 +128,16 @@ def estimate_scour_depth_and_time_scale(U_cw, KC, DL_ratio, theta_cw):
     B = (6-5.8 * np.tanh(200*((DL_ratio)**1.9)))*np.exp(-4.7* U_cw)
     S_eq = S_max * (1 - np.exp(-A*(max(KC,0.5) - B)))
 
-    # Scouring time scale
-    psi = 8 * 10**-5 * KC **2.5
-    omega = 1/375 * (h/D)**0.75
-
     # Set up conditions
     if KC < 4:
-        KC = 4
+        KC_temp = 4 # Temporary value as KC is less than 4 in the next formula
+    else:
+        KC_temp = KC
+
+    # Scouring time scale
+    psi = 8 * 10**-5 * KC_temp **2.5
+    omega = 1/375 * (h/D)**0.75
+
 
     if U_cw < 0.44:
         ratio_T_star_s_theta = psi * ((0.18 / psi)**(1/0.44))**U_cw  
@@ -148,28 +149,44 @@ def estimate_scour_depth_and_time_scale(U_cw, KC, DL_ratio, theta_cw):
     T_s = D**2 / (np.sqrt(g*(s-1)*d50**3)) * T_star_s
 
     # Backfilling time scale
-    T_star_b = (1/50 + 0.015 * (np.exp(-350*(U_cw-0.5)**2)+np.exp(-25*(U_cw-0.53)**2))) * theta_cw**(-5/3)   # Non-dimensional timescale
+    # FIXME: ask what happens if KC is between 2 and 3 (LEcture , slide 54)
+    if KC < 2:
+        upsilon = 0.31
+    elif KC > 3:
+        upsilon = 8.5 * KC ** (-0.5)
+    else:
+        print("Problem with upsilon")
+        upsilon = 0
+
+    lambda_big = 1 - 0.09*np.tanh(3000*U_cw**20-0.6**20)
+    
+    T_star_b = upsilon * lambda_big * theta_cw**(-3/2)
     T_b = D**2 / (np.sqrt(g * (s - 1) * d50**3)) * T_star_b  
 
-    return S_eq, ratio_T_star_s_theta, T_star_s, T_s, T_star_b, T_b, KC
+    return S_eq,T_star_s, T_s, T_star_b, T_b, KC
 
 
 
+# Print the results
+S_eq_calm, T_star_calm, T_calm, T_star_b_calm, T_b_calm, KC_used_calm = estimate_scour_depth_and_time_scale(U_cw_calm, KC_w_calm, DL_ratio_calm, theta_cw_calm)
+S_eq_norm, T_star_norm, T_norm, T_star_b_norm, T_b_norm, KC_used_norm = estimate_scour_depth_and_time_scale(U_cw_norm, KC_w_norm, DL_ratio_norm, theta_cw_norm)
+S_eq_storm, T_star_storm, T_storm, T_star_b_storm, T_b_storm, KC_used_storm = estimate_scour_depth_and_time_scale(U_cw_storm, KC_w_storm, DL_ratio_storm, theta_cw_storm)
 
-
-
-S_eq_calm, ratio_T_star_s_theta_calm, T_star_calm, T_calm, T_star_b_calm, T_b_calm, KC_used_calm = estimate_scour_depth_and_time_scale(U_cw_calm, KC_tot_calm, DL_ratio_calm, theta_cw_calm)
-S_eq_norm, ratio_T_star_s_theta_norm, T_star_norm, T_norm, T_star_b_norm, T_b_norm, KC_used_norm = estimate_scour_depth_and_time_scale(U_cw_norm, KC_tot_norm, DL_ratio_norm, theta_cw_norm)
-S_eq_storm, ratio_T_star_s_theta_storm, T_star_storm, T_storm, T_star_b_storm, T_b_storm, KC_used_storm = estimate_scour_depth_and_time_scale(U_cw_storm, KC_tot_storm, DL_ratio_storm, theta_cw_storm)
-
+# Put them into a nice table 
 scour_table = pt.PrettyTable()
-scour_table.field_names = ["Condition", "Ratio T*_s/θ", "KC", "S_eq (m)", "T_star", "Time scale (s)"]
+scour_table.field_names = ["Condition","KC", "S_eq (m)", "T_star_s", "T_s[hrs]", "T_star_b", "T_b[hrs]"]
 scour_table.align["Condition"] = "l"
 scour_table.add_rows([
-    ["Calm", f"{ratio_T_star_s_theta_calm:.2f}", f"{KC_used_calm:.2f}", f"{S_eq_calm:.2f}", f"{T_star_calm:.2e}", f"{T_calm:.2f}"],
-    ["Normal", f"{ratio_T_star_s_theta_norm:.2f}", f"{KC_used_norm:.2f}", f"{S_eq_norm:.2f}", f"{T_star_norm:.2e}", f"{T_norm:.2f}"],
-    ["Storm", f"{ratio_T_star_s_theta_storm:.2f}", f"{KC_used_storm:.2f}", f"{S_eq_storm:.2f}", f"{T_star_storm:.2e}", f"{T_storm:.2f}"],
+    ["Calm", f"{KC_used_calm:.2f}", f"{S_eq_calm:.2f}", f"{T_star_calm:.2e}", f"{T_calm/3600:.2f}", f"{T_star_b_calm:.2e}", f"{T_b_calm/3600:.2f}"],
+    ["Normal", f"{KC_used_norm:.2f}", f"{S_eq_norm:.2f}", f"{T_star_norm:.2e}", f"{T_norm/3600:.2f}", f"{T_star_b_norm:.2e}", f"{T_b_norm/3600:.2f}"],
+    ["Storm", f"{KC_used_storm:.2f}", f"{S_eq_storm:.2f}", f"{T_star_storm:.2e}", f"{T_storm/3600:.2f}", f"{T_star_b_storm:.2e}", f"{T_b_storm/3600:.2f}"],
 ])
 
 print("\nEstimated Equilibrium Scour Depths and Time Scales")
 print(scour_table)
+
+
+
+# ==========================================================================
+# TASK 7: Scour Development 
+# ==========================================================================
