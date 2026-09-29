@@ -252,7 +252,7 @@ plt.figure(figsize=(8, 4.5), dpi=150)
 plt.plot(t_tidal / (24 * 3600), velocity_tidal, color="tab:blue", linewidth=1.2)
 plt.xlabel("Time [days]")
 plt.ylabel("Depth-averaged velocity, $V_c(t)$ [m/s]")
-plt.title("Depth-averaged tidal velocity over 14 days")
+#plt.title("Depth-averaged tidal velocity over 14 days")
 plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.show()
@@ -401,14 +401,14 @@ print(
 # === Summary of all three scour developments ===
 
 plt.figure(figsize=(8, 4.5), dpi=150)
-plt.title("Comparison of scour development under different conditions")
+#plt.title("Comparison of scour development under different conditions")
 # Use one common time axis and interpolate the tidal results onto it.
 t_max_plot = max(t_plot[-1], t_four_months_c[-1], t_four_months_cw[-1])
 t_summary = np.linspace(0, t_max_plot, 400)
 
 # Calm condition scour development
 plt.plot(
-    t_summary / (24 * 3600),
+    t_summary / (24 * 3600),#
     scour_dev(t_summary, S_eq_calm, T_calm) / D,
     color="tab:blue",
     linewidth=2,
