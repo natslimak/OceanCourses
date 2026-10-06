@@ -306,13 +306,13 @@ fig, axes = plt.subplots(2, 1, figsize=(8, 6), dpi=150, sharey=True)
 axes[0].plot(t_week_c / (24 * 3600), scour_week_c, color="tab:green", linewidth=1.5)
 axes[0].set_title("Time Varying Current-only scour development over one week")
 axes[0].set_xlabel("Time [days]")
-axes[0].set_ylabel("Scour depth, $S$")
+axes[0].set_ylabel("Scour depth, $S$ [m]")
 axes[0].grid(True, alpha=0.3)
 
 axes[1].plot(t_four_months_c / (24 * 3600), scour_four_months_c, color="tab:purple", linewidth=1.5)
 axes[1].set_title("Time Varying Current-only scour development over four months")
 axes[1].set_xlabel("Time [days]")
-axes[1].set_ylabel("Scour depth, $S$")
+axes[1].set_ylabel("Scour depth, $S$ [m]")
 axes[1].grid(True, alpha=0.3)
 
 plt.tight_layout()
@@ -379,13 +379,13 @@ fig, axes = plt.subplots(2, 1, figsize=(8, 6), dpi=150, sharey=True)
 axes[0].plot(t_week_cw / (24 * 3600), scour_week_cw, color="tab:green", linewidth=1.5)
 axes[0].set_title("Time Varying Current + Calm Waves scour development over one week")
 axes[0].set_xlabel("Time [days]")
-axes[0].set_ylabel("Scour depth, $S$")
+axes[0].set_ylabel("Scour depth, $S$ [m]")
 axes[0].grid(True, alpha=0.3)
 
 axes[1].plot(t_four_months_cw / (24 * 3600), scour_four_months_cw, color="tab:purple", linewidth=1.5)
 axes[1].set_title("Time Varying Current + Calm Waves scour development over four months")
 axes[1].set_xlabel("Time [days]")
-axes[1].set_ylabel("Scour depth, $S$")
+axes[1].set_ylabel("Scour depth, $S$ [m]")
 axes[1].grid(True, alpha=0.3)
 
 plt.tight_layout()
@@ -439,13 +439,25 @@ plt.legend(title="Scour development conditions:")
 # TASK 9: Two-layer Scour Protection Design
 # ============================================================================
 
-t_filt = 0.9        # Filter layer thickness [m]
-t_armour = 3*D      # Armour layer thickness [m]
+# Armour layer specifications 
+#D50_stone = 90e-3                      # Median stone size [m] CP63/180
+b_armour = 3 * D                        # Armour layer  [m]
+rho_stone = 3200                        # Stone density [kg/m^3]
+M_50 = 37                              # Mass of the filter layer [kg/m^2]
+D_n50_armour = np.cbrt(M_50/rho_stone)  # Nominal filter size [m]
+D50_stone = D_n50_armour / 0.84         # Median stone size [m] CP63/180
 
-# Stone specifications 
-D50_stone = 90e-3       # Median stone size [m] CP63/180
-htop = 1.0              # Water depth above the armour layer [m]
-rho_stone = 3200        # Stone density [kg/m^3]
+
+# Filter layer specifications (Light Grading)
+rho_filter = 3200                       # Filter layer density [kg/m^3]
+D50_filter = 125e-3                      # Sieve diameter of the filter layer [m]
+D15_filter = 90e-3                      # Sieve diameter of the filter layer [m]
+
+
+# Other parameters
+t_armour_init = 1.1                             # Initial guess of the armour height [m]
+t_filter = 0.9                                  # Filter layer thickness [m]
+htop = h - (t_filter + t_armour_init)           # Water depth above the armour layer [m]
 
 
 def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
@@ -481,10 +493,13 @@ def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
     KC_w = (U_m_bed * Tp) / D
     KC_c = (V * Tp) / D # FIXME Is the U_c here V?
     KC_tot = KC_w + KC_c
-
+    print(f"KC_w: {KC_w:.3f}, KC_c: {KC_c:.3f}, KC_tot: {KC_tot:.3f}")
 
 
     # === Calculating bed shear stress and Shields parameter ===
+
+    # Bed rounghness height
+    ks = 2.5 * D50_stone
 
     # Ratio of wave orbital motion amplitude to roughness height
     A_wa_ks = A_wa / ks
@@ -499,6 +514,8 @@ def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
 
     # Wave-related shear velocity 
     u_star_w = np.sqrt(f_w / 2) * U_m_top
+
+    print(f"u_star_w: {u_star_w:.3f}, f_w: {f_w:.3f}, A_wa/ks: {A_wa_ks:.3f}")
 
     # wave bed shear stress 
     tau_w = rho * u_star_w ** 2
@@ -521,8 +538,10 @@ def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
     # The maximum combined current and wave bed shear stress
     alfa = 0
     tau_max = tau_m + tau_w 
+    alfa = 0
+    tau_max = np.sqrt(tau_m ** 2 + tau_w ** 2 + 2 * tau_m * tau_w * (np.cos((alfa * np.pi)/180)))
 
-
+    print(f"tau_max: {tau_max:.3f}, tau_m: {tau_m:.3f}, tau_w: {tau_w:.3f}, tau_c: {tau_c:.3f}")
 
     # === Calculating the mobility number ===
 
@@ -537,6 +556,7 @@ def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
 
     # Combined waves and current Shields parameter
     theta_cw = tau_max / ((rho_s - rho) * g * D50_stone)
+    print(f"theta_cw: {theta_cw:.3f}, theta_cr: {theta_cr:.3f}")
 
     # Mobility number
     MOB = theta_cw / theta_cr
@@ -545,26 +565,38 @@ def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
 
     # === Estimating depth of deformation ===
     f_KCtot = 1 + (3.9274 / (1 + np.exp(-0.7401 * KC_tot + 4.7518)))
-
+    
     # Depth of deformation
-    S_90perc = D * f_KCtot * (MOB ** 1.6492)
+    S_90perc = D * f_KCtot * (0.1134 * MOB ** 1.6492)
+    print(f"MOB: {MOB:.3f}, f_KCtot: {f_KCtot:.3f}\nS_90perc: {S_90perc:.3f} m")
 
-    return MOB, S_90perc
+
+    # === Calculate the total thickness of the armour layer ===
+    
+    # Get the thickness
+    Dn50 = 0.84 * D50_filter
+    t_rock = 0.89 * Dn50
+    t_armour = 2 * t_rock + S_90perc
+
+    # Extend of the filter layer 
+    b_filter = b_armour + 2 * t_armour + 1
+
+    return MOB, S_90perc, t_armour, b_filter
 
 
 # Get the details for calm, normal, and storm conditions
-MOB_calm, S_90perc_calm = get_details_HASPRO(V_calm, Hs_calm, Tp_calm)
-MOB_normal, S_90perc_normal = get_details_HASPRO(V_norm, Hs_norm, Tp_norm)
-MOB_storm, S_90perc_storm = get_details_HASPRO(V_storm, Hs_storm, Tp_storm)
+MOB_calm, S_90perc_calm, t_armour_calm, b_filter_calm = get_details_HASPRO(V_calm, Hs_calm, Tp_calm)
+MOB_normal, S_90perc_normal, t_armour_normal, b_filter_normal = get_details_HASPRO(V_norm, Hs_norm, Tp_norm)
+MOB_storm, S_90perc_storm, t_armour_storm, b_filter_storm = get_details_HASPRO(V_storm, Hs_storm, Tp_storm)
 
 # Make a summary table with the results
 HASPRO_table = pt.PrettyTable()
-HASPRO_table.field_names = ["Condition", "Mobility Number", "Depth of Deformation"]
+HASPRO_table.field_names = ["Condition", "Mobility Number", "Depth of Deformation", "Armour Layer Thickness", "Filter Layer Width"]
 HASPRO_table.align["Condition"] = "l"
 HASPRO_table.add_rows([
-    ["Calm", f"{MOB_calm:.2f}", f"{S_90perc_calm:.2f} m"],
-    ["Normal", f"{MOB_normal:.2f}", f"{S_90perc_normal:.2f} m"],
-    ["Storm", f"{MOB_storm:.2f}", f"{S_90perc_storm:.2f} m"],
+    ["Calm", f"{MOB_calm:.2f}", f"{S_90perc_calm:.2f} m", f"{t_armour_calm:.2f} m", f"{b_filter_calm:.2f} m"],
+    ["Normal", f"{MOB_normal:.2f}", f"{S_90perc_normal:.2f} m", f"{t_armour_normal:.2f} m", f"{b_filter_normal:.2f} m"],
+    ["Storm", f"{MOB_storm:.2f}", f"{S_90perc_storm:.2f} m", f"{t_armour_storm:.2f} m", f"{b_filter_storm:.2f} m"],
 ])
 
 print("\nTwo-layer Scour Protection Design Results")
