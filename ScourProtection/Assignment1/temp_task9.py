@@ -44,13 +44,22 @@ Tp_storm = 14.0     # Peak wave period in storm conditions [s]
 # TASK 9: Two-layer Scour Protection Design
 # ============================================================================
 
-t_filt = 0.9        # Filter layer thickness [m]
-t_armour = 3*D      # Armour layer thickness [m]
+# Armour layer specifications 
+#D50_stone = 90e-3         # Median stone size [m] CP63/180
+D50_stone = 0.27           # Median stone size [m] CP63/180
+b_armour = 3 * D           # Armour layer  [m]
+rho_stone = 3200           # Stone density [kg/m^3]
 
-# Stone specifications 
-D50_stone = 90e-3       # Median stone size [m] CP63/180
-htop = h - 1.9     # Water depth above the armour layer [m]
-rho_stone = 3200        # Stone density [kg/m^3]
+# Filter layer specifications
+D50_filter = 0.09           # Median filter size [m]
+rho_filter = 2650           # Filter layer density [kg/m^3]
+
+
+# Other parameters
+t_armour_init = 1.0                             # Initial guess of the armour height [m]
+t_filter = 0.9                                  # Filter layer thickness [m]
+htop = h - (t_filter + t_armour_init)           # Water depth above the armour layer [m]
+
 
 
 def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
@@ -162,22 +171,31 @@ def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
     # Depth of deformation
     S_90perc = D * f_KCtot * (0.1134 * MOB ** 1.6492)
     print(f"MOB: {MOB:.3f}, f_KCtot: {f_KCtot:.3f}\nS_90perc: {S_90perc:.3f} m\n")
-    return MOB, S_90perc
+
+
+    # === Calculate the total thickness of the armour layer ===
+    
+    # Get the thickness
+    Dn50 = 0.84 * D50_filter
+    t_rock = 0.89 * Dn50
+    t_armour = 2 * t_rock + S_90perc
+
+    return MOB, S_90perc, t_armour
 
 
 # Get the details for calm, normal, and storm conditions
-MOB_calm, S_90perc_calm = get_details_HASPRO(V_calm, Hs_calm, Tp_calm)
-MOB_normal, S_90perc_normal = get_details_HASPRO(V_norm, Hs_norm, Tp_norm)
-MOB_storm, S_90perc_storm = get_details_HASPRO(V_storm, Hs_storm, Tp_storm)
+MOB_calm, S_90perc_calm, t_armour_calm = get_details_HASPRO(V_calm, Hs_calm, Tp_calm)
+MOB_normal, S_90perc_normal, t_armour_normal = get_details_HASPRO(V_norm, Hs_norm, Tp_norm)
+MOB_storm, S_90perc_storm, t_armour_storm = get_details_HASPRO(V_storm, Hs_storm, Tp_storm)
 
 # Make a summary table with the results
 HASPRO_table = pt.PrettyTable()
-HASPRO_table.field_names = ["Condition", "Mobility Number", "Depth of Deformation"]
+HASPRO_table.field_names = ["Condition", "Mobility Number", "Depth of Deformation", "Armour Layer Thickness"]
 HASPRO_table.align["Condition"] = "l"
 HASPRO_table.add_rows([
-    ["Calm", f"{MOB_calm:.2f}", f"{S_90perc_calm:.2f} m"],
-    ["Normal", f"{MOB_normal:.2f}", f"{S_90perc_normal:.2f} m"],
-    ["Storm", f"{MOB_storm:.2f}", f"{S_90perc_storm:.2f} m"],
+    ["Calm", f"{MOB_calm:.2f}", f"{S_90perc_calm:.2f} m", f"{t_armour_calm:.2f} m"],
+    ["Normal", f"{MOB_normal:.2f}", f"{S_90perc_normal:.2f} m", f"{t_armour_normal:.2f} m"],
+    ["Storm", f"{MOB_storm:.2f}", f"{S_90perc_storm:.2f} m", f"{t_armour_storm:.2f} m"],
 ])
 
 print("\nTwo-layer Scour Protection Design Results")
