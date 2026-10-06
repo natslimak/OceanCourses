@@ -566,3 +566,6 @@ HASPRO_table.add_rows([
     ["Normal", f"{MOB_normal:.2f}", f"{S_90perc_normal:.2f} m"],
     ["Storm", f"{MOB_storm:.2f}", f"{S_90perc_storm:.2f} m"],
 ])
+
+print("\nTwo-layer Scour Protection Design Results")
+print(HASPRO_table)
