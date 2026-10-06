@@ -434,3 +434,135 @@ plt.xlabel("Time [days]")
 plt.ylabel("Scour depth, $S/D$")
 plt.legend(title="Scour development conditions:")
 
+
+# ============================================================================
+# TASK 9: Two-layer Scour Protection Design
+# ============================================================================
+
+t_filt = 0.9        # Filter layer thickness [m]
+t_armour = 3*D      # Armour layer thickness [m]
+
+# Stone specifications 
+D50_stone = 90e-3       # Median stone size [m] CP63/180
+htop = 1.0              # Water depth above the armour layer [m]
+rho_stone = 3200        # Stone density [kg/m^3]
+
+
+def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
+    """Calculate the KC numbers, U_cw, D/L ratio and theta_cw for a given set of conditions."""
+
+    # Statying consistent with the scour handbook
+    hw = h
+
+
+    # === Calculating hydrodynamic parameters ===
+
+    # Wave velocity near the bed
+    Tz = Tp / 1.3
+    U_m_bed = (Hs / (2 * np.sqrt(2))) * np.sqrt(g/h) * np.exp(-((3.65/Tz) * np.sqrt(h/g))**2.1)
+    
+    # Wave lenght
+    L0 = g * Tp**2 / (2 * np.pi)    # Initial guess for wavelength in deep water
+    def dispersion_relation(L):
+        return (g * Tp**2/(2*np.pi)) * np.tanh((2*np.pi*hw)/L) - L
+    L = fsolve(dispersion_relation, L0)[0]
+        
+    # Corerction factor
+    K_top = (np.sinh(2 * np.pi * hw / L) ** 2) / (np.sinh(2 * np.pi * htop / L))
+
+    # Wave velocity on top of the scour protection
+    U_m_top = K_top * U_m_bed
+
+    # Wave orbital motion amplitude on top of the scour protection
+    A_wtop = U_m_top * Tp / (2 * np.pi)
+    A_wa = A_wtop   
+
+    # Get the KC numbers
+    KC_w = (U_m_bed * Tp) / D
+    KC_c = (V * Tp) / D # FIXME Is the U_c here V?
+    KC_tot = KC_w + KC_c
+
+
+
+    # === Calculating bed shear stress and Shields parameter ===
+
+    # Ratio of wave orbital motion amplitude to roughness height
+    A_wa_ks = A_wa / ks
+
+    # Wave friction factor (Roulund's roughness)
+    if 0.2 < A_wa / ks < 2.92:
+        f_w = 0.32 * (A_wa / ks) ** (-0.8)
+    elif 2.92 <= A_wa / ks < 727:
+        f_w = 0.237 * (A_wa / ks) ** (-0.52)
+    elif A_wa / ks >= 727:
+        f_w = 0.04 * (A_wa / ks) ** (-0.25)
+
+    # Wave-related shear velocity 
+    u_star_w = np.sqrt(f_w / 2) * U_m_top
+
+    # wave bed shear stress 
+    tau_w = rho * u_star_w ** 2
+
+    # Current induced bed shear stress
+    z_0 = ks / 30
+
+    # Drag coefficient
+    C_D = (0.4 / (np.log(hw / z_0)-1)) ** 2
+
+    # Current shear velocity
+    u_star_c = np.sqrt(C_D) * V
+
+    # Current shear stress
+    tau_c = rho * u_star_c ** 2
+
+    # The mean combined current and wave bed shear stress
+    tau_m = tau_c * (1.2 * tau_c * (tau_w / (tau_c + tau_w)) ** (3.2))
+
+    # The maximum combined current and wave bed shear stress
+    alfa = 0
+    tau_max = tau_m + tau_w 
+
+
+
+    # === Calculating the mobility number ===
+
+    # specific rock density
+    delta_s = rho_stone - rho / rho
+
+    # dimensionless particle diameter
+    d_star = d50 * (delta_s * g / nu**2)**(1/3)
+
+    # Critical Shields parameter
+    theta_cr = 0.3 / (1 + 1.2*d_star)+0.055*(1-np.exp(-0.02*d_star))
+
+    # Combined waves and current Shields parameter
+    theta_cw = tau_max / ((rho_s - rho) * g * D50_stone)
+
+    # Mobility number
+    MOB = theta_cw / theta_cr
+
+
+
+    # === Estimating depth of deformation ===
+    f_KCtot = 1 + (3.9274 / (1 + np.exp(-0.7401 * KC_tot + 4.7518)))
+
+    # Depth of deformation
+    S_90perc = D * f_KCtot * (MOB ** 1.6492)
+
+    return MOB, S_90perc
+
+
+# Get the details for calm, normal, and storm conditions
+MOB_calm, S_90perc_calm = get_details_HASPRO(V_calm, Hs_calm, Tp_calm)
+MOB_normal, S_90perc_normal = get_details_HASPRO(V_norm, Hs_norm, Tp_norm)
+MOB_storm, S_90perc_storm = get_details_HASPRO(V_storm, Hs_storm, Tp_storm)
+
+# Make a summary table with the results
+HASPRO_table = pt.PrettyTable()
+HASPRO_table.field_names = ["Condition", "Mobility Number", "Depth of Deformation"]
+HASPRO_table.align["Condition"] = "l"
+HASPRO_table.add_rows([
+    ["Calm", f"{MOB_calm:.2f}", f"{S_90perc_calm:.2f} m"],
+    ["Normal", f"{MOB_normal:.2f}", f"{S_90perc_normal:.2f} m"],
+    ["Storm", f"{MOB_storm:.2f}", f"{S_90perc_storm:.2f} m"],
+])

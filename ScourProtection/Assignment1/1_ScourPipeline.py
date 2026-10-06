@@ -204,9 +204,10 @@ print(f'Width 2: {W_2_c:.2f} m')
 
 
 # === CASE 3: Tidal Current ===
-S_eq_t = 0.6 * D
-W_1_t = 4 * D
-W_2_t = 4 * D
+KC_tidal = 300      # Taken from Sumer and Fredsoe (2002)
+S_eq_t = 2.5 * D    # Read from the figure 2.23 Sumer and Fredsoe (2002)
+W_1_t = 0.35 * KC_tidal**0.65 * D
+W_2_t = 0.35 * KC_tidal**0.65 * D
 
 print('\n2D Equilibrium Scour Profile - Tidal Current:')
 print(f'Depth: {S_eq_t:.2f} m')
