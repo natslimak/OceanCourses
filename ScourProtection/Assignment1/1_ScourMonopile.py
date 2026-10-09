@@ -443,7 +443,7 @@ plt.legend(title="Scour development conditions:")
 #D50_stone = 90e-3                      # Median stone size [m] CP63/180
 b_armour = 3 * D                        # Armour layer  [m]
 rho_stone = 3200                        # Stone density [kg/m^3]
-M_50 = 37                              # Mass of the filter layer [kg/m^2]
+M_50 = 37                              # Mass of the filter layer [kg]
 D_n50_armour = np.cbrt(M_50/rho_stone)  # Nominal filter size [m]
 D50_stone = D_n50_armour / 0.84         # Median stone size [m] CP63/180
 
@@ -480,7 +480,7 @@ def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
     L = fsolve(dispersion_relation, L0)[0]
         
     # Corerction factor
-    K_top = (np.sinh(2 * np.pi * hw / L) ** 2) / (np.sinh(2 * np.pi * htop / L))
+    K_top = (np.sinh(2 * np.pi * hw / L) ) / (np.sinh(2 * np.pi * htop / L))
 
     # Wave velocity on top of the scour protection
     U_m_top = K_top * U_m_bed
@@ -504,13 +504,23 @@ def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
     # Ratio of wave orbital motion amplitude to roughness height
     A_wa_ks = A_wa / ks
 
-    # Wave friction factor (Roulund's roughness)
-    if 0.2 < A_wa / ks < 2.92:
-        f_w = 0.32 * (A_wa / ks) ** (-0.8)
-    elif 2.92 <= A_wa / ks < 727:
-        f_w = 0.237 * (A_wa / ks) ** (-0.52)
-    elif A_wa / ks >= 727:
-        f_w = 0.04 * (A_wa / ks) ** (-0.25)
+    # Limit ratio to lower applicability bound of Roulund formulation
+    A_wa_ks_eff = max(A_wa_ks, 0.2)
+
+    print(
+        f"A_wa/ks: {A_wa_ks:.4f}, "
+        f"effective A_wa/ks: {A_wa_ks_eff:.4f}"
+    )
+
+    # Wave friction factor
+    if A_wa_ks_eff < 2.92:
+        f_w = 0.32 * A_wa_ks_eff ** (-0.8)
+
+    elif A_wa_ks_eff < 727:
+        f_w = 0.237 * A_wa_ks_eff ** (-0.52)
+
+    else:
+        f_w = 0.04 * A_wa_ks_eff ** (-0.25)
 
     # Wave-related shear velocity 
     u_star_w = np.sqrt(f_w / 2) * U_m_top
@@ -533,11 +543,9 @@ def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
     tau_c = rho * u_star_c ** 2
 
     # The mean combined current and wave bed shear stress
-    tau_m = tau_c * (1.2 * tau_c * (tau_w / (tau_c + tau_w)) ** (3.2))
+    tau_m = tau_c + (1.2 * tau_c * ((tau_w / (tau_c + tau_w))) ** (3.2))
 
     # The maximum combined current and wave bed shear stress
-    alfa = 0
-    tau_max = tau_m + tau_w 
     alfa = 0
     tau_max = np.sqrt(tau_m ** 2 + tau_w ** 2 + 2 * tau_m * tau_w * (np.cos((alfa * np.pi)/180)))
 
@@ -546,7 +554,7 @@ def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
     # === Calculating the mobility number ===
 
     # specific rock density
-    delta_s = rho_stone - rho / rho
+    delta_s = (rho_stone - rho) / rho
 
     # dimensionless particle diameter
     d_star = d50 * (delta_s * g / nu**2)**(1/3)
@@ -575,7 +583,7 @@ def get_details_HASPRO(V, Hs, Tp, h=h, D=D, htop=htop):
     
     # Get the thickness
     Dn50 = 0.84 * D50_filter
-    t_rock = 0.89 * Dn50
+    t_rock = 0.89 * D_n50_armour
     t_armour = 2 * t_rock + S_90perc
 
     # Extend of the filter layer 
