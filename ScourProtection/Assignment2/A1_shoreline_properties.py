@@ -33,11 +33,6 @@ for critical_Hs in np.arange(0.1, 100, 0.01):
 # Get the wave period for that critical Hs value
 critical_Tp = np.mean(Tp[Hs > critical_Hs])
 
-# Print the results
-print(f"Exceeded Hs: {critical_Hs:.3f} m")
-print(f"Exceeded Tp: {critical_Tp:.3f} s")
-
-
 
 # =================================================================
 # 1.2 Closure Depth
@@ -45,9 +40,6 @@ print(f"Exceeded Tp: {critical_Tp:.3f} s")
 
 # Hallermeiers formula for assessing closure depth
 d_l = 1.57 * critical_Hs * (critical_Tp / 10) ** (1/3)
-
-print(f"\nClosure Depth: {d_l:.3f} m")
-
 
 
 # =================================================================
@@ -78,22 +70,6 @@ q_alpha = pd.DataFrame(
     }
 )
 
-print("\nQ-alpha transport results:")
-print(q_alpha.to_string(index=False, float_format="{:.3f}".format))
-
-plt.figure()
-plt.plot(orientations, net_transport, "o-", label="Net")
-plt.plot(orientations, gross_transport, "o-", label="Gross")
-plt.plot(orientations, left_transport, "o-", label="Left")
-plt.plot(orientations, right_transport, "o-", label="Right")
-plt.axhline(0, color="black", linewidth=0.8)
-plt.xlabel(r"Shoreline orientation, $\alpha$ [$^\circ$]")
-plt.ylabel(r"Transport, $Q$ [$\mathrm{m}^3/\mathrm{m}/\mathrm{year}$]")
-plt.title(r"Sediment transport $Q$-$\alpha$ curve")
-plt.grid(True, alpha=0.3)
-plt.legend()
-plt.tight_layout()
-plt.show()
 
 
 # =================================================================
@@ -107,6 +83,7 @@ sign_changes = np.flatnonzero(net_transport[:-1] * net_transport[1:] < 0)
 
 if exact_zero.size:
     null_net_orientation = orientations[exact_zero[0]]
+    null_net_orientation = round(null_net_orientation, 2) 
 elif sign_changes.size:
     i = sign_changes[0]
     null_net_orientation = orientations[i] - (
@@ -114,7 +91,45 @@ elif sign_changes.size:
         * (orientations[i + 1] - orientations[i])
         / (net_transport[i + 1] - net_transport[i])
     )
+    null_net_orientation = round(null_net_orientation, 2) 
+
 else:
     raise ValueError("No null net orientation found in the supplied data.")
 
-print(f"\nNull Net Orientation: {null_net_orientation:.3f} degrees")
+
+
+def main():
+    # === TASK 1 ===
+    print(f"Exceeded Hs: {critical_Hs:.3f} m")
+    print(f"Exceeded Tp: {critical_Tp:.3f} s")
+
+
+    # === TASK 2 ===
+    print(f"\nClosure Depth: {d_l:.3f} m")
+
+
+    # === TASK 3 ===
+    print("\nQ-alpha transport results:")
+    print(q_alpha.to_string(index=False, float_format="{:.3f}".format))
+
+    plt.figure()
+    plt.plot(orientations, net_transport, "o-", label="Net")
+    plt.plot(orientations, gross_transport, "o-", label="Gross")
+    plt.plot(orientations, left_transport, "o-", label="Left")
+    plt.plot(orientations, right_transport, "o-", label="Right")
+    plt.axhline(0, color="black", linewidth=0.8)
+    plt.xlabel(r"Shoreline orientation, $\alpha$ [$^\circ$]")
+    plt.ylabel(r"Transport, $Q$ [$\mathrm{m}^3/\mathrm{m}/\mathrm{year}$]")
+    plt.title(r"Sediment transport $Q$-$\alpha$ curve")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+    # === TASK 4 ===
+    print(f"\nNull Net Orientation: {null_net_orientation:.3f} degrees")
+
+
+if __name__ == "__main__":
+    main()
