@@ -31,7 +31,7 @@ C0 = -0.0002 * beta**2 + 0.0079 * beta - 0.0209
 C1 = 0.0002 * beta**2 + 0.0004 * beta + 0.9437
 C2 = -0.00005 * beta**2 - 0.0093 * beta + 0.0879
 
-theta = np.linspace(beta, beta+90, 1000)           # range of orientations to evaluate
+theta = np.linspace(beta, beta+180, 1000)           # range of orientations to evaluate
 Rs = []
 
 for theta_i in theta:
@@ -40,12 +40,35 @@ for theta_i in theta:
 
 Rs = np.asarray(Rs)
 
+polar_ax = plt.subplot(111, projection="polar")
+polar_ax.set_theta_direction(-1)
+polar_ax.set_theta_zero_location("N")
+polar_ax.plot(np.deg2rad(theta), Rs, color="tab:blue", linewidth=2)
+beach_norm_rad = np.deg2rad(beach_norm)
+polar_ax.plot(
+    [beach_norm_rad, beach_norm_rad],
+    [0, np.max(Rs)],
+    color="tab:red",
+    linestyle="--",
+    linewidth=1.5,
+    label=f"{beach_norm}\N{DEGREE SIGN} beach normal",
+)
+perpendicular_rad = np.deg2rad(beach_norm + 90)
+polar_ax.plot(
+    [perpendicular_rad, perpendicular_rad],
+    [0, np.max(Rs)],
+    color="tab:green",
+    linestyle="-",
+    linewidth=1.5,
+    label=f"{(beach_norm + 90) % 360:.0f}\N{DEGREE SIGN} shoreline",
+)
+plt.title("Parabolic bay shape")
+polar_ax.legend(loc="upper right", bbox_to_anchor=(1.2, 1.1))
+
 # Convert the polar coordinates to Cartesian coordinates.
-# theta is in degrees for the engineering equations, so convert it to radians
-# before using it with sin and cos.
 theta_rad = np.deg2rad(theta)
-x = Rs * np.cos(theta_rad)
-y = Rs * np.sin(theta_rad)
+x = Rs * np.sin(theta_rad)
+y = Rs * np.cos(theta_rad)
 
 # Plot the bay shape in a local Cartesian coordinate system.
 fig, ax = plt.subplots()
