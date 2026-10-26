@@ -47,10 +47,19 @@ print(f"Selected R0: {R0:.2f} m")
 print(f"Rfirst + Rlast: {endpoint_sum:.2f} m")
 print(f"Endpoint error: {abs(endpoint_sum - target_length):.2f} m")
 
-polar_ax = plt.subplot(111, projection="polar")
+polar_fig, polar_ax = plt.subplots(
+    figsize=(8, 8),
+    subplot_kw={"projection": "polar"},
+)
 polar_ax.set_theta_direction(-1)
 polar_ax.set_theta_zero_location("N")
-polar_ax.plot(np.deg2rad(theta), Rs, color="tab:blue", linewidth=2)
+polar_ax.plot(
+    np.deg2rad(theta),
+    Rs,
+    color="tab:blue",
+    linewidth=2,
+    label="Shoreline",
+)
 beach_norm_rad = np.deg2rad(beach_norm)
 polar_ax.plot(
     [beach_norm_rad, beach_norm_rad],
@@ -60,43 +69,141 @@ polar_ax.plot(
     linewidth=1.5,
     label=f"{beach_norm}\N{DEGREE SIGN} beach normal",
 )
-plt.title("Parabolic bay shape")
-polar_ax.legend(loc="upper right", bbox_to_anchor=(1.2, 1.1))
+polar_ax.set_title("Parabolic bay shape in polar coordinates", pad=20)
+polar_ax.grid(True, alpha=0.3)
+polar_ax.legend(loc="upper right", bbox_to_anchor=(1.25, 1.12))
+polar_fig.tight_layout()
 
 # Convert the polar coordinates to Cartesian coordinates.
 theta_rad = np.deg2rad(theta)
 x = Rs * np.sin(theta_rad)
 y = Rs * np.cos(theta_rad)
 
-# Plot the bay shape in a local Cartesian coordinate system.
-fig, ax = plt.subplots()
-ax.plot(x, y, color="tab:blue", linewidth=2, label="Shoreline")
 
-# The first and last angles differ by 180 degrees, so their shoreline
-# points lie on one straight line through the fixed point. The distance
-# between them is Rs[0] + Rs[-1].
-first_point = (x[0], y[0])
-last_point = (x[-1], y[-1])
+
+
+
+
+# Plot the bay shape in a local Cartesian coordinate system.
+fig, ax = plt.subplots(figsize=(10, 8))
+
+# Find the point where the shoreline tangent is parallel to the direction
+# perpendicular to the 292-degree beach normal.
+perpendicular_angle = (beach_norm + 90) % 360
+perpendicular_rad = np.deg2rad(perpendicular_angle)
+line_direction = np.array(
+    [np.sin(perpendicular_rad), np.cos(perpendicular_rad)]
+)
+dx_dtheta = np.gradient(x)
+dy_dtheta = np.gradient(y)
+tangent_cross_product = (
+    dx_dtheta * line_direction[1] - dy_dtheta * line_direction[0]
+)
+tangent_index = 1 + np.argmin(
+    np.abs(tangent_cross_product[1:-1])
+)
+tangent_point = np.array([x[tangent_index], y[tangent_index]])
+
+# Project the beginning and end of the shoreline onto the tangent line.
+# These projections define the line endpoints, with perpendiculars joining
+# them to the corresponding shoreline points.
+shoreline_start = np.array([x[0], y[0]])
+shoreline_end = np.array([x[-1], y[-1]])
+line_start = tangent_point + np.dot(
+    shoreline_start - tangent_point, line_direction
+) * line_direction
+line_end = tangent_point + np.dot(
+    shoreline_end - tangent_point, line_direction
+) * line_direction
+line_length = np.linalg.norm(line_end - line_start)
+
 ax.plot(
-    [first_point[0], last_point[0]],
-    [first_point[1], last_point[1]],
+    [line_start[0], line_end[0]],
+    [line_start[1], line_end[1]],
     color="tab:red",
     linewidth=2,
-    label=f"Perpendicular chord ({endpoint_sum:.2f} m)",
+    label=f"Old shoreline ({target_length:.2f} m)",
+)
+
+ax.plot(
+    x,
+    y,
+    color="tab:blue",
+    linewidth=2.5,
+    label="New shoreline",
+)
+
+# Plot the radius from the fixed point to the beginning of the shoreline.
+R0_selected = Rs[0]
+ax.plot(
+    [0, x[0]],
+    [0, y[0]],
+    color="tab:green",
+    linestyle="--",
+    linewidth=2,
+    label=rf"Control line $R_0$ ({R0_selected:.2f} m)",
+)
+
+ax.plot(
+    [shoreline_start[0], line_start[0]],
+    [shoreline_start[1], line_start[1]],
+    color="tab:orange",
+    linestyle=":",
+    linewidth=1.4,
+    label="Perpendicular projections",
+)
+ax.plot(
+    [shoreline_end[0], line_end[0]],
+    [shoreline_end[1], line_end[1]],
+    color="tab:orange",
+    linestyle=":",
+    linewidth=1.4,
 )
 ax.scatter(
-    [first_point[0], last_point[0]],
-    [first_point[1], last_point[1]],
-    color="tab:red",
+    0,
+    0,
+    color="black",
+    edgecolors="white",
+    linewidth=0.8,
+    s=70,
+    zorder=3,
+    label="Upcoast fixed point",
+)
+ax.scatter(
+    [shoreline_start[0], shoreline_end[0]],
+    [shoreline_start[1], shoreline_end[1]],
+    color="tab:blue",
+    edgecolors="white",
+    linewidth=0.8,
+    s=45,
     zorder=3,
     label="Shoreline endpoints",
 )
-ax.scatter(0, 0, color="black", zorder=3, label="Upcoast fixed point")
+ax.scatter(
+    tangent_point[0],
+    tangent_point[1],
+    color="tab:red",
+    edgecolors="white",
+    linewidth=0.8,
+    s=40,
+    zorder=3,
+    label="Tangency point",
+)
+
 ax.set_xlabel("x [m]")
 ax.set_ylabel("y [m]")
-ax.set_title("Parabolic bay shape")
+ax.set_title("Parabolic bay shape in Cartesian coordinates", pad=12)
 ax.set_aspect("equal", adjustable="box")
 ax.grid(True, alpha=0.3)
-ax.legend()
-fig.tight_layout()
+ax.axhline(0, color="0.5", linewidth=0.8, zorder=0)
+ax.axvline(0, color="0.5", linewidth=0.8, zorder=0)
+ax.set_xlim(-100, 800)
+ax.set_ylim(-250, 900)
+ax.legend(
+    loc="lower right",
+    framealpha=0.7,
+    facecolor="white",
+    edgecolor="0.7",
+)
+fig.tight_layout(rect=(0, 0, 0.78, 1))
 plt.show()
