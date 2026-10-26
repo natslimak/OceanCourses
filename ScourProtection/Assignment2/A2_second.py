@@ -71,6 +71,26 @@ y = Rs * np.cos(theta_rad)
 # Plot the bay shape in a local Cartesian coordinate system.
 fig, ax = plt.subplots()
 ax.plot(x, y, color="tab:blue", linewidth=2, label="Shoreline")
+
+# The first and last angles differ by 180 degrees, so their shoreline
+# points lie on one straight line through the fixed point. The distance
+# between them is Rs[0] + Rs[-1].
+first_point = (x[0], y[0])
+last_point = (x[-1], y[-1])
+ax.plot(
+    [first_point[0], last_point[0]],
+    [first_point[1], last_point[1]],
+    color="tab:red",
+    linewidth=2,
+    label=f"Perpendicular chord ({endpoint_sum:.2f} m)",
+)
+ax.scatter(
+    [first_point[0], last_point[0]],
+    [first_point[1], last_point[1]],
+    color="tab:red",
+    zorder=3,
+    label="Shoreline endpoints",
+)
 ax.scatter(0, 0, color="black", zorder=3, label="Upcoast fixed point")
 ax.set_xlabel("x [m]")
 ax.set_ylabel("y [m]")
