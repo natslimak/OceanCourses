@@ -1,10 +1,11 @@
 """ Design Parameters of Breakwaters """
 
 import numpy as np
-from scipy.optimize import fsolve
+from scipy.optimize import curve_fit, fsolve, minimize_scalar
 from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator
 import scipy.stats as stats
 
 # Data from excel files
@@ -14,11 +15,9 @@ df_wave = pd.read_excel(wave_file, sheet_name="Sheet1", header=None, names=["tim
 drift_file = Path(__file__).parent / "Data" / "Drift_calculations_results.xlsx"
 drift_sheet = pd.read_excel(drift_file, sheet_name=0, header=None)
 
-
 # Data
 L = 50          # Lifetime of the structure (years)
-p_f = 0.2        # Exceedance probability of failure
-
+p_f = 0.2       # Exceedance probability of failure
 
 
 # =================================================================
@@ -42,8 +41,7 @@ time_year = (df_wave["time"] - df_wave["time"].iloc[0]).dt.total_seconds() / (24
 Hs = df_wave["Hs"].values           # Significant Wave Height
 Tp = df_wave["Tp"].values           # Peak Wave Period
 
-# 97th-percentile threshold
-u = stats.scoreatpercentile(df_wave["Hs"].dropna(), 97)
+# Hand-picked threshold
 u = 1.2
 
 # Keep only threshold exceedances
@@ -73,14 +71,15 @@ print(f"Number of independent storm peaks: {len(peaks)}")
 
 
 
-plt.figure(figsize=(12, 6))
+plt.figure(figsize=(14, 5))
 plt.plot(time_year, Hs, label="Significant Wave Height (Hs)", color='b')
 plt.plot(peaks_time_year, peaks["Hs"], linestyle="None", marker="+", markersize=10,
     markeredgewidth=1.5, color="orange", label="Storm peaks")
-plt.axhline(y=u, color='r', linestyle='--', label=f"95th Percentile: {u:.2f} m")
-plt.title("Significant Wave Height over Time")
+plt.axhline(y=u, color='r', linestyle='--')
+#plt.title("Significant Wave Height over Time")
 plt.xlabel("Time (years)")
 plt.ylabel("Significant Wave Height (m)")
+plt.gca().xaxis.set_major_locator(MultipleLocator(1))
 plt.grid()
 plt.legend()
 plt.tight_layout()
@@ -94,7 +93,51 @@ print(f"Return period: {T_R:.2f} years")
 # =================================================================
 # 2. Generalized Pareto distribution
 # =================================================================
-#F = 1 - (1 - (ksi * (x - u))/sigma) ** (1 / ksi)  # CDF of GPD
+
+excesses = np.sort((peaks["Hs"] - u).to_numpy())[::-1]
+n = len(excesses)
+i = np.arange(1, n + 1)
+plotting_position = 1 - i / (n + 1)
+
+
+def gpd_cdf_excess(excess, ksi, sigma):
+    """GPD CDF from the course equation, using excess = Hs - u."""
+    return 1 - (1 - (ksi * excess) / sigma) ** (1 / ksi)
+
+# Fit the GDP curve to the plotting_position data
+gpd_parameters, _ = curve_fit(gpd_cdf_excess, excesses, plotting_position,
+    p0=(0.1, 1.0), bounds=((1e-6, 1e-6), (0.9, np.inf)), maxfev=10000,)
+gpd_ksi, gpd_sigma = gpd_parameters
+
+
+plt.plot(excesses, plotting_position, "+", label="Storm peaks")
+fitted_excesses = np.linspace(0, excesses.max(), 100)
+plt.plot(fitted_excesses, gpd_cdf_excess(fitted_excesses, gpd_ksi, gpd_sigma), "r-", label="GPD fitted curve")
+plt.title("GPD fitted directly to plotting positions")
+plt.xlabel(r"$X = H_s-u$ [m]")
+plt.ylabel(r"$F$")
+plt.grid()
+plt.legend()
+plt.show()
+
+print(f"GPD shape (ksi): {gpd_ksi:.4f}")
+print(f"GPD scale (sigma): {gpd_sigma:.4f} m")
+
+
+y = excesses * (gpd_ksi / gpd_sigma)
+x = excesses
+
+# Fit a line to x and y 
+fit = np.polyfit(x, y, 1)
+slope, intercept = fit
+
+plt.plot(x, y, "+", label="Storm peaks")
+plt.plot(x, slope * x + intercept, "r-", label="Fitted line")
+plt.title("GPD fitted to transformed data")
+plt.xlabel(r"$X = H_s-u$ [m]")
+plt.ylabel(r"$Y = \xi X / \sigma$")
+plt.grid()
+plt.show()
 
 
 # =================================================================
