@@ -120,7 +120,7 @@ def main():
     plt.axhline(0, color="black", linewidth=0.8)
     plt.xlabel(r"Shoreline orientation, $\alpha$ [$^\circ$]")
     plt.ylabel(r"Transport, $Q$ [$\mathrm{m}^3/\mathrm{m}/\mathrm{year}$]")
-    plt.title(r"Sediment transport $Q$-$\alpha$ curve")
+    #plt.title(r"Sediment transport $Q$-$\alpha$ curve")
     plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
