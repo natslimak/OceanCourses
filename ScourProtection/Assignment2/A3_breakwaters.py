@@ -1,12 +1,14 @@
 """ Design Parameters of Breakwaters """
 
 import numpy as np
-from scipy.optimize import curve_fit, fsolve, minimize_scalar
+from scipy.optimize import fsolve, minimize_scalar
 from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 import scipy.stats as stats
+from scipy.stats import genpareto
+
 
 # Data from excel files
 wave_file = Path(__file__).parent / "Data" / "Hs_Tp_3h_GR8.xls"
@@ -94,25 +96,21 @@ print(f"Return period: {T_R:.2f} years")
 # 2. Generalized Pareto distribution
 # =================================================================
 
+# Initiate the plotting positions for the excesses (Hs - u)
 excesses = np.sort((peaks["Hs"] - u).to_numpy())[::-1]
 n = len(excesses)
 i = np.arange(1, n + 1)
-plotting_position = 1 - i / (n + 1)
+plotting_position = 1 - i / (n + 1)     # based on distribution of frequencie
 
 
-def gpd_cdf_excess(excess, ksi, sigma):
-    """GPD CDF from the course equation, using excess = Hs - u."""
-    return 1 - (1 - (ksi * excess) / sigma) ** (1 / ksi)
-
-# Fit the GDP curve to the plotting_position data
-gpd_parameters, _ = curve_fit(gpd_cdf_excess, excesses, plotting_position,
-    p0=(0.1, 1.0), bounds=((1e-6, 1e-6), (0.9, np.inf)), maxfev=10000,)
-gpd_ksi, gpd_sigma = gpd_parameters
+# Fit the GPD to the excesses using maximum likelihood
+gpd_ksi, _, gpd_sigma = genpareto.fit(excesses, floc=0)
 
 
 plt.plot(excesses, plotting_position, "+", label="Storm peaks")
 fitted_excesses = np.linspace(0, excesses.max(), 100)
-plt.plot(fitted_excesses, gpd_cdf_excess(fitted_excesses, gpd_ksi, gpd_sigma), "r-", label="GPD fitted curve")
+plt.plot(fitted_excesses, genpareto.cdf(fitted_excesses, gpd_ksi, loc=0, scale=gpd_sigma),
+    "r-", label="GPD fitted curve")
 plt.title("GPD fitted directly to plotting positions")
 plt.xlabel(r"$X = H_s-u$ [m]")
 plt.ylabel(r"$F$")
@@ -133,9 +131,9 @@ slope, intercept = fit
 
 plt.plot(x, y, "+", label="Storm peaks")
 plt.plot(x, slope * x + intercept, "r-", label="Fitted line")
-plt.title("GPD fitted to transformed data")
-plt.xlabel(r"$X = H_s-u$ [m]")
-plt.ylabel(r"$Y = \xi X / \sigma$")
+plt.title("Fitting GPD to transformed data")
+plt.xlabel(r"$X$")
+plt.ylabel(r"$Y$")
 plt.grid()
 plt.show()
 
