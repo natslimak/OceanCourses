@@ -123,21 +123,19 @@ ls_ksi, ls_sigma = ls_parameters
 # mean = sigma / (1 - ksi), variance = sigma**2 / ((1 - ksi)**2 * (1 - 2*ksi)).
 excess_mean = excesses.mean()
 excess_variance = excesses.var(ddof=1)
-mom_ksi = 0.5 * (1 - excess_mean**2 / excess_variance)
-mom_sigma = excess_mean * (1 - mom_ksi)
+mom_ksi = -0.5 * (1 - excess_mean**2 / excess_variance)
+mom_sigma = excess_mean * (1 + mom_ksi)
 
 # Maximum-likelihood estimates are included for comparison.
 ml_ksi, _, ml_sigma = genpareto.fit(excesses, floc=0)
-
+ml_ksi = -ml_ksi
 
 plt.plot(excesses, plotting_position, "+", label="Storm peaks")
 fitted_excesses = np.linspace(0, excesses.max(), 100)
 plt.plot(fitted_excesses, gpd_cdf(fitted_excesses, ls_ksi, ls_sigma),
     "r-", label="Least-squares fit")
 plt.plot(fitted_excesses, gpd_cdf(fitted_excesses, mom_ksi, mom_sigma),
-    "g--", label="Method of moments")
-plt.plot(fitted_excesses, gpd_cdf(fitted_excesses, ml_ksi, ml_sigma),
-    "b:", label="Maximum likelihood")
+    "g-", label="Method of moments")
 plt.title("GPD fitted directly to plotting positions")
 plt.xlabel(r"$X = H_s-u$ [m]")
 plt.ylabel(r"$F$")
@@ -147,7 +145,6 @@ plt.show()
 
 print(f"Least-squares:       ksi = {ls_ksi:.4f}, sigma = {ls_sigma:.4f} m")
 print(f"Method of moments:   ksi = {mom_ksi:.4f}, sigma = {mom_sigma:.4f} m")
-print(f"Maximum likelihood:  ksi = {ml_ksi:.4f}, sigma = {ml_sigma:.4f} m")
 
 
 # Return levels use the annual rate of independent storm peaks above u.
@@ -171,8 +168,6 @@ plt.plot(return_periods, return_level(return_periods, ls_ksi, ls_sigma),
     "o-", label="Least squares")
 plt.plot(return_periods, return_level(return_periods, mom_ksi, mom_sigma),
     "s--", label="Method of moments")
-plt.plot(return_periods, return_level(return_periods, ml_ksi, ml_sigma),
-    "^:", label="Maximum likelihood")
 plt.axvline(T_R, color="k", linestyle=":", label=f"Required T = {T_R:.1f} years")
 plt.xlabel("Return period [years]")
 plt.ylabel(r"Estimated wave height $H_s$ [m]")
@@ -186,8 +181,7 @@ plt.show()
 selected_method = "least_squares"
 parameter_sets = {
     "least_squares": (ls_ksi, ls_sigma),
-    "method_of_moments": (mom_ksi, mom_sigma),
-    "maximum_likelihood": (ml_ksi, ml_sigma),
+    "method_of_moments": (mom_ksi, mom_sigma)
 }
 selected_ksi, selected_sigma = parameter_sets[selected_method]
 design_hs = return_level(T_R, selected_ksi, selected_sigma)

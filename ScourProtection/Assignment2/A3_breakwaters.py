@@ -1,7 +1,7 @@
 """ Design Parameters of Breakwaters """
 
 import numpy as np
-from scipy.optimize import fsolve, minimize_scalar
+from scipy.optimize import curve_fit, fsolve, minimize_scalar
 from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -103,14 +103,41 @@ i = np.arange(1, n + 1)
 plotting_position = 1 - i / (n + 1)     # based on distribution of frequencie
 
 
-# Fit the GPD to the excesses using maximum likelihood
-gpd_ksi, _, gpd_sigma = genpareto.fit(excesses, floc=0)
+def gpd_cdf(excess, ksi, sigma):
+    """ GPD CDF using the presentation convention"""
+    value = 1 - ksi * excess / sigma
+    return np.where(value > 0, 1 - value ** (1 / ksi), 1.0)
+
+
+# Least-squares fit to the empirical CDF.
+ls_parameters, _ = curve_fit(
+    gpd_cdf,
+    excesses,
+    plotting_position,
+    p0=(0.1, 1.0),
+    bounds=((-0.9, 1e-6), (0.49, np.inf)),
+    maxfev=10000,
+)
+ls_ksi, ls_sigma = ls_parameters
+
+# Method-of-moments estimates for a GPD:
+# mean = sigma / (1 - ksi), variance = sigma**2 / ((1 - ksi)**2 * (1 - 2*ksi)).
+excess_mean = excesses.mean()
+excess_variance = excesses.var(ddof=0)
+mom_ksi = -0.5 * (1 - excess_mean**2 / excess_variance)
+mom_sigma = excess_mean * (1 + mom_ksi)
+
+
 
 
 plt.plot(excesses, plotting_position, "+", label="Storm peaks")
 fitted_excesses = np.linspace(0, excesses.max(), 100)
-plt.plot(fitted_excesses, genpareto.cdf(fitted_excesses, gpd_ksi, loc=0, scale=gpd_sigma),
-    "r-", label="GPD fitted curve")
+plt.plot(fitted_excesses, gpd_cdf(fitted_excesses, ls_ksi, ls_sigma),
+    "r-", label="Least-squares fit")
+plt.plot(fitted_excesses, gpd_cdf(fitted_excesses, mom_ksi, mom_sigma),
+    "g-", label="Method of moments")
+#plt.plot(fitted_excesses, gpd_cdf(fitted_excesses, ml_ksi, ml_sigma),
+    #"b:", label="Maximum likelihood")
 plt.title("GPD fitted directly to plotting positions")
 plt.xlabel(r"$X = H_s-u$ [m]")
 plt.ylabel(r"$F$")
@@ -118,19 +145,114 @@ plt.grid()
 plt.legend()
 plt.show()
 
-print(f"GPD shape (ksi): {gpd_ksi:.4f}")
-print(f"GPD scale (sigma): {gpd_sigma:.4f} m")
+print(f"Least-squares:       ksi = {ls_ksi:.4f}, sigma = {ls_sigma:.4f} m")
+print(f"Method of moments:   ksi = {mom_ksi:.4f}, sigma = {mom_sigma:.4f} m")
 
 
-y = excesses * (gpd_ksi / gpd_sigma)
+# Return levels use the annual rate of independent storm peaks above u.
+record_years = time_year.iloc[-1]
+peaks_per_year = len(peaks) / record_years
+return_periods = np.array([1, 5, 10, 25, 50, 100, T_R])
+
+
+def return_level(return_period, ksi, sigma):
+    """Estimate Hs exceeded once every return_period years."""
+    rate_term = peaks_per_year * return_period
+
+    if np.isclose(ksi, 0):
+        excess = sigma * np.log(rate_term)
+    else:
+        excess = sigma / ksi * (1 - rate_term ** (-ksi))
+
+    return u + excess
+
+plt.figure()
+plt.plot(return_periods, return_level(return_periods, ls_ksi, ls_sigma),
+    "o-", label="Least squares")
+plt.plot(return_periods, return_level(return_periods, mom_ksi, mom_sigma),
+    "s--", label="Method of moments")
+plt.axvline(T_R, color="k", linestyle=":", label=f"Required T = {T_R:.1f} years")
+plt.xlabel("Return period [years]")
+plt.ylabel(r"Estimated wave height $H_s$ [m]")
+plt.xscale("log")
+plt.grid()
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+# Select the parameter set after inspecting the return-level plot.
+selected_method = "least_squares"
+parameter_sets = {
+    "least_squares": (ls_ksi, ls_sigma),
+    "method_of_moments": (mom_ksi, mom_sigma),
+}
+selected_ksi, selected_sigma = parameter_sets[selected_method]
+design_hs = return_level(T_R, selected_ksi, selected_sigma)
+print(f"Selected method: {selected_method}")
+print(f"Design Hs for T = {T_R:.2f} years: {design_hs:.3f} m")
+
+
+#y = excesses * (selected_ksi / selected_sigma)
+# Answer: ksi 0.0327, sigma 0.2
+
 x = excesses
 
+ksi_range = np.linspace(0.0, 0.5,2000)
+
+smallest_error = np.inf
+best_ksi = None
+best_sigma = None
+errors = []
+for ksi in ksi_range:
+    y = 1 - (1 - plotting_position) ** ksi
+    #A = np.sum(x * y) / np.sum(x ** 2)\
+    A = np.polyfit(x, y, 1)[0]
+    y_fit = x * A
+
+    sigma = ksi / A
+
+    # plt.plot(x, y, "+", label="Storm peaks")
+    # plt.plot(x, y_fit, "--", label="Fitted line")
+    # #plt.plot(x, slope * x + intercept, "r-", label="Fitted line")
+    # plt.title("Fitting GPD to transformed data")
+    # plt.xlabel(r"$X$")
+    # plt.ylabel(r"$Y$")
+    # plt.grid()
+    # plt.show()
+
+    # print(A)
+    # print(f"ksi: {ksi:.4f}, sigma: {sigma:.4f}")
+
+    pareto_real = 1 - (1 - (ksi * x / sigma)) ** (1 / ksi)
+
+    
+    error = (1 / n) * np.sum((np.abs(plotting_position - pareto_real)) / plotting_position)
+    errors.append(error)
+    if error < smallest_error:
+        smallest_error = error
+        best_ksi = ksi
+        best_sigma = sigma
+        # print(best_ksi, best_sigma)
+
+
+print("Resuts of the parameter search:")
+print(f"Smallest error: {smallest_error}")
+print(f"ksi: {best_ksi}")
+print(f"sigma: {best_sigma}")
+
+np.polyfit(x,y, 1)
 # Fit a line to x and y 
 fit = np.polyfit(x, y, 1)
 slope, intercept = fit
+#slope = selected_ksi / selected_sigma
 
-plt.plot(x, y, "+", label="Storm peaks")
-plt.plot(x, slope * x + intercept, "r-", label="Fitted line")
+y_best = 1 - (1 - plotting_position) ** best_ksi
+A_best = best_ksi / best_sigma
+print(A_best)
+y_best_fit = x * A_best
+plt.plot(x, y_best, "+", label="Storm peaks")
+plt.plot(x, y_best_fit, "--", label="Fitted line")
+#plt.plot(x, slope * x + intercept, "r-", label="Fitted line")
 plt.title("Fitting GPD to transformed data")
 plt.xlabel(r"$X$")
 plt.ylabel(r"$Y$")
