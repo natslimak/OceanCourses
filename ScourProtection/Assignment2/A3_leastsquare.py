@@ -122,7 +122,7 @@ for threshold in [1.2, 1.4]:
 
 
 # Hand-picked threshold
-u = 1.1
+u = 1.255
 
 # Keep only threshold exceedances
 exceedances = df_wave[df_wave["Hs"] > u].copy()

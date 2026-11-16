@@ -44,7 +44,7 @@ Hs = df_wave["Hs"].values           # Significant Wave Height
 Tp = df_wave["Tp"].values           # Peak Wave Period
 
 # Hand-picked threshold
-u = 1.1
+u = 1.255
 
 # Keep only threshold exceedances
 exceedances = df_wave[df_wave["Hs"] > u].copy()
@@ -278,19 +278,78 @@ plt.show()
 # 3. Relationship between the Hs and Tp
 # =================================================================
 
-"""
-Tp_est = 3.4 * np.sqrt(df_wave["Hs"])  # Empirical relationship between Hs and Tp
+valid_wave = (
+    np.isfinite(df_wave["Hs"])
+    & np.isfinite(df_wave["Tp"])
+    & (df_wave["Hs"] > 0)
+    & (df_wave["Tp"] > 0)
+)
+fit_wave = df_wave.loc[valid_wave & (df_wave["Hs"] >= 0.2)]
+
+def hs_tp_relationship(hs, alpha, beta):
+    return alpha * hs ** beta
+
+
+relationship_parameters, _ = curve_fit(
+    hs_tp_relationship,
+    fit_wave["Hs"],
+    fit_wave["Tp"],
+    p0=(3.4, 0.5),
+    bounds=([0, 0], [np.inf, np.inf]),
+    maxfev=10000,
+)
+alpha, beta = relationship_parameters
+
+hs_fit = np.linspace(
+    0,
+    3,
+    200,
+)
+tp_fit = alpha * hs_fit ** beta
 
 plt.figure(figsize=(10, 6))
-plt.scatter(df_wave["Hs"], df_wave["Tp"], color='b', label="Storm Peaks")
-plt.plot(df_wave["Hs"], Tp_est, color='r', label="Estimated Tp (3.4 * sqrt(Hs))")
+plt.scatter(
+    df_wave.loc[valid_wave & (df_wave["Hs"] < 0.2), "Hs"],
+    df_wave.loc[valid_wave & (df_wave["Hs"] < 0.2), "Tp"],
+    color="lightskyblue",
+    s=10,
+    alpha=0.5,
+    label=r"Excluded points ($H_s < 0.3$ m)",
+)
+plt.scatter(
+    fit_wave["Hs"],
+    fit_wave["Tp"],
+    color="b",
+    s=10,
+    alpha=0.35,
+    label=r"Fitting data ($H_s \geq 0.3$ m)",
+)
+plt.plot(
+    hs_fit,
+    tp_fit,
+    color="r",
+    label=fr"Fitted relationship: $T_p = {alpha:.2f}H_s^{{{beta:.2f}}}$",
+)
 plt.title("Relationship between Significant Wave Height (Hs) and Peak Wave Period (Tp)")
 plt.xlabel("Significant Wave Height (Hs) [m]")
 plt.ylabel("Peak Wave Period (Tp) [s]")
+plt.xlim(0, 3)
+plt.ylim(bottom=0)
 plt.grid()
 plt.legend()
-plt.show()"""
+plt.show()
+
+print(f"Fitted relationship from {len(fit_wave)} observations (Hs >= 0.3 m): "
+      f"Tp = {alpha:.4f} * Hs^{beta:.4f}")
+
+
+
+
+
+
 
 # =================================================================
 # 4. Estimate the design Hs and Tp
 # =================================================================
+x_TR = best_sigma/best_ksi * (1 - (peaks_per_year * T_R)** (-best_ksi)) + u
+print(f"Design Hs for T = {T_R:.2f} years: {x_TR:.3f} m")
