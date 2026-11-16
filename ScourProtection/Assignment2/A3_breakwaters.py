@@ -29,7 +29,7 @@ p_f = 0.2       # Exceedance probability of failure
 def probability_residual(T_R, p, L):
     """ Calculate the residual of the probability equation. """
     calculated_p = 1 - (1 - 1 / T_R) ** L
-    return calculated_p -p
+    return calculated_p - p
 
 # Solve for the return period T_R 
 T_R = fsolve(probability_residual, x0=200, args=(p_f, L),)[0]
@@ -44,7 +44,7 @@ Hs = df_wave["Hs"].values           # Significant Wave Height
 Tp = df_wave["Tp"].values           # Peak Wave Period
 
 # Hand-picked threshold
-u = 1.2
+u = 1.1
 
 # Keep only threshold exceedances
 exceedances = df_wave[df_wave["Hs"] > u].copy()
@@ -192,9 +192,7 @@ print(f"Selected method: {selected_method}")
 print(f"Design Hs for T = {T_R:.2f} years: {design_hs:.3f} m")
 
 
-#y = excesses * (selected_ksi / selected_sigma)
-# Answer: ksi 0.0327, sigma 0.2
-
+# Define the excesses for the least-squares fit
 x = excesses
 
 ksi_range = np.linspace(0.0, 0.5,2000)
@@ -252,11 +250,27 @@ print(A_best)
 y_best_fit = x * A_best
 plt.plot(x, y_best, "+", label="Storm peaks")
 plt.plot(x, y_best_fit, "--", label="Fitted line")
+# Add ksi and sigma values to the plot
+plt.text(0.1, 0.9, f"Best ksi: {best_ksi:.4f}\nBest sigma: {best_sigma:.4f}\nCalc A: {A_best:.4f}", transform=plt.gca().transAxes, fontsize=10,
+         bbox=dict(facecolor='white', alpha=0.5, edgecolor='black'))
 #plt.plot(x, slope * x + intercept, "r-", label="Fitted line")
 plt.title("Fitting GPD to transformed data")
 plt.xlabel(r"$X$")
 plt.ylabel(r"$Y$")
 plt.grid()
+plt.show()
+
+
+# Plot goodness-of-fit versus ksi
+plt.figure()
+plt.plot(ksi_range, errors)
+plt.axvline(best_ksi, color="r", linestyle="--",
+            label=f"Best ksi = {best_ksi:.4f}")
+plt.xlabel(r"$\xi$")
+plt.ylabel("Average relative error")
+plt.title("GPD goodness-of-fit")
+plt.grid()
+plt.legend()
 plt.show()
 
 
