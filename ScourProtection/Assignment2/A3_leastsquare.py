@@ -43,6 +43,9 @@ time_year = (df_wave["time"] - df_wave["time"].iloc[0]).dt.total_seconds() / (24
 Hs = df_wave["Hs"].values           # Significant Wave Height
 Tp = df_wave["Tp"].values           # Peak Wave Period
 
+
+print(f"Return period: {T_R:.2f} years")
+
 ########################################################################################
 # --------------------Cool ChatGPT diagnostics--------------------------------------
 ########################################################################################
@@ -116,10 +119,10 @@ for threshold in [1.2, 1.4]:
     if len(selected):
         print(f"Mean excess: {np.mean(selected - threshold):.4f} m")
 
+
 ########################################################################################
 #--------------------------------- Cool ChatGPT diagnostics------------------------------
 ########################################################################################
-
 
 # Hand-picked threshold
 u = 1.255
@@ -149,14 +152,13 @@ print(f"Threshold: {u:.2f} m")
 print(f"Number of exceedances: {len(exceedances)}")
 print(f"Number of independent storm peaks: {len(peaks)}")
 
-
-
+# Plot the significant wave height time series with storm peaks
 plt.figure(figsize=(14, 5))
 plt.plot(time_year, Hs, label="Significant Wave Height (Hs)", color='b')
 plt.plot(peaks_time_year, peaks["Hs"], linestyle="None", marker="+", markersize=10,
     markeredgewidth=1.5, color="orange", label="Storm peaks")
 plt.axhline(y=u, color='r', linestyle='--')
-#plt.title("Significant Wave Height over Time")
+plt.title("Significant Wave Height over Time")
 plt.xlabel("Time (years)")
 plt.ylabel("Significant Wave Height (m)")
 plt.gca().xaxis.set_major_locator(MultipleLocator(1))
@@ -166,114 +168,27 @@ plt.tight_layout()
 plt.show()
 
 
-print(f"Return period: {T_R:.2f} years")
-
 
 
 # =================================================================
 # 2. Generalized Pareto distribution
 # =================================================================
 
-# Initiate the plotting positions for the excesses (Hs - u)
+# === Initiate the plotting positions for the excesses (Hs - u) ===
 excesses = np.sort((peaks["Hs"] - u).to_numpy())[::-1]
 n = len(excesses)
 i = np.arange(1, n + 1)
-plotting_position = 1 - i / (n + 1)     # based on distribution of frequencie
+plotting_position = 1 - i / (n + 1)     # based on distribution of frequencies
 
 
-def gpd_cdf(excess, ksi, sigma):
-    """ GPD CDF using the presentation convention"""
-    value = 1 - ksi * excess / sigma
-    return np.where(value > 0, 1 - value ** (1 / ksi), 1.0)
-
-
-# Least-squares fit to the empirical CDF.
-ls_parameters, _ = curve_fit(
-    gpd_cdf,
-    excesses,
-    plotting_position,
-    p0=(0.1, 1.0),
-    bounds=((-0.9, 1e-6), (0.49, np.inf)),
-    maxfev=10000,
-)
-ls_ksi, ls_sigma = ls_parameters
-
-# Method-of-moments estimates for a GPD:
-# mean = sigma / (1 - ksi), variance = sigma**2 / ((1 - ksi)**2 * (1 - 2*ksi)).
+# === METHOD 2: Method of moments ===
 excess_mean = excesses.mean()
 excess_variance = excesses.var(ddof=0)
 mom_ksi = -0.5 * (1 - excess_mean**2 / excess_variance)
 mom_sigma = excess_mean * (1 + mom_ksi)
 
 
-
-
-plt.plot(excesses, plotting_position, "+", label="Storm peaks")
-fitted_excesses = np.linspace(0, excesses.max(), 100)
-plt.plot(fitted_excesses, gpd_cdf(fitted_excesses, ls_ksi, ls_sigma),
-    "r-", label="Least-squares fit")
-plt.plot(fitted_excesses, gpd_cdf(fitted_excesses, mom_ksi, mom_sigma),
-    "g-", label="Method of moments")
-#plt.plot(fitted_excesses, gpd_cdf(fitted_excesses, ml_ksi, ml_sigma),
-    #"b:", label="Maximum likelihood")
-plt.title("GPD fitted directly to plotting positions")
-plt.xlabel(r"$X = H_s-u$ [m]")
-plt.ylabel(r"$F$")
-plt.grid()
-plt.legend()
-plt.show()
-
-print(f"Least-squares:       ksi = {ls_ksi:.4f}, sigma = {ls_sigma:.4f} m")
-print(f"Method of moments:   ksi = {mom_ksi:.4f}, sigma = {mom_sigma:.4f} m")
-
-
-# Return levels use the annual rate of independent storm peaks above u.
-record_years = time_year.iloc[-1]
-peaks_per_year = len(peaks) / record_years
-return_periods = np.array([1, 5, 10, 25, 50, 100, T_R])
-
-
-def return_level(return_period, ksi, sigma):
-    """Estimate Hs exceeded once every return_period years."""
-    rate_term = peaks_per_year * return_period
-
-    if np.isclose(ksi, 0):
-        excess = sigma * np.log(rate_term)
-    else:
-        excess = sigma / ksi * (1 - rate_term ** (-ksi))
-
-    return u + excess
-
-plt.figure()
-plt.plot(return_periods, return_level(return_periods, ls_ksi, ls_sigma),
-    "o-", label="Least squares")
-plt.plot(return_periods, return_level(return_periods, mom_ksi, mom_sigma),
-    "s--", label="Method of moments")
-plt.axvline(T_R, color="k", linestyle=":", label=f"Required T = {T_R:.1f} years")
-plt.xlabel("Return period [years]")
-plt.ylabel(r"Estimated wave height $H_s$ [m]")
-plt.xscale("log")
-plt.grid()
-plt.legend()
-plt.tight_layout()
-plt.show()
-
-# Select the parameter set after inspecting the return-level plot.
-selected_method = "least_squares"
-parameter_sets = {
-    "least_squares": (ls_ksi, ls_sigma),
-    "method_of_moments": (mom_ksi, mom_sigma),
-}
-selected_ksi, selected_sigma = parameter_sets[selected_method]
-design_hs = return_level(T_R, selected_ksi, selected_sigma)
-print(f"Selected method: {selected_method}")
-print(f"Design Hs for T = {T_R:.2f} years: {design_hs:.3f} m")
-
-
-#y = excesses * (selected_ksi / selected_sigma)
-# Answer: ksi 0.0327, sigma 0.2
-
-
+# === METHOD 1: Least-squares regression through the origin ===
 x = excesses
 F = plotting_position
 
@@ -285,15 +200,9 @@ best_sigma = None
 errors = []
 
 for ksi in ksi_range:
-
-    # Reduced variate from the lecture
-    y = 1 - (1 - F) ** ksi
-
-    # Least-squares regression through the origin
-    A = np.sum(x * y) / np.sum(x ** 2)
-
-    # Calculate sigma
-    sigma = ksi / A
+    y = 1 - (1 - F) ** ksi                  # Reduced variate from the lecture
+    A = np.sum(x * y) / np.sum(x ** 2)      # Least-squares regression through the origin
+    sigma = ksi / A                         # Calculate sigma = slope
 
     # Check that the distribution is valid
     if np.any(1 - ksi * x / sigma <= 0):
@@ -307,27 +216,20 @@ for ksi in ksi_range:
     Hs_estimated = u + x_estimated
     Hs_observed = u + x
 
-    error = np.mean(
-        np.abs(Hs_estimated - Hs_observed) / Hs_observed
-    )
-
+    # Calculate the average relative error
+    error = np.mean(np.abs(Hs_estimated - Hs_observed) / Hs_observed)
     errors.append(error)
 
+    # Update the best parameters if this is the smallest error so far
     if error < smallest_error:
         smallest_error = error
         best_ksi = ksi
         best_sigma = sigma
 
-print("Results of the parameter search:")
-print(f"Smallest error: {smallest_error:.4%}")
-print(f"ksi: {best_ksi:.5f}")
-print(f"sigma: {best_sigma:.5f}")
-
 # Plot goodness-of-fit versus ksi
 plt.figure()
 plt.plot(ksi_range, errors)
-plt.axvline(best_ksi, color="r", linestyle="--",
-            label=f"Best ksi = {best_ksi:.4f}")
+plt.axvline(best_ksi, color="r", linestyle="--", label=f"Best ksi = {best_ksi:.4f}")
 plt.xlabel(r"$\xi$")
 plt.ylabel("Average relative error")
 plt.title("GPD goodness-of-fit")
@@ -339,6 +241,7 @@ plt.show()
 y_best = 1 - (1 - F) ** best_ksi
 A_best = best_ksi / best_sigma
 
+# Plot the transformed least-squares fit
 plt.figure()
 plt.plot(x, y_best, "+", label="Storm peaks")
 plt.plot(x, A_best * x, "--", label="Fitted line")
@@ -347,6 +250,62 @@ plt.ylabel(r"$Y$")
 plt.title("Least-squares GPD fit")
 plt.grid()
 plt.legend()
+plt.show()
+
+
+# === SUMMARY OF RESULTS ===
+print("Results of the parameter (least-squares) search:")
+print(f"Smallest error: {smallest_error:.4%}")
+print(f"ksi: {best_ksi:.5f}")
+print(f"sigma: {best_sigma:.5f}")
+
+print("Results of the parameter (method of moments) search:")
+print(f"ksi: {mom_ksi:.5f}")
+print(f"sigma: {mom_sigma:.5f}")
+
+
+# === GET THE RETURN LEVELS FOR THE REQUIRED RETURN PERIOD ===
+
+# Return levels use the annual rate of independent storm peaks above u.
+record_years = time_year.iloc[-1]
+peaks_per_year = len(peaks) / record_years
+#return_periods = np.array([1, 5, 10, 25, 50, 100, T_R])
+return_periods = np.linspace(1, T_R, 100)
+
+def return_level(return_period, ksi, sigma):
+    """Estimate Hs exceeded once every return_period years."""
+    rate_term = peaks_per_year * return_period
+
+    if np.isclose(ksi, 0):
+        excess = sigma * np.log(rate_term)
+    else:
+        excess = sigma / ksi * (1 - rate_term ** (-ksi))
+
+    return u + excess
+
+# Plot the return levels for both methods
+plt.figure(figsize=(10, 6))
+least_squares_at_TR = return_level(T_R, best_ksi, best_sigma)
+mom_at_TR = return_level(T_R, mom_ksi, mom_sigma)
+
+least_squares_line, = plt.plot(return_periods, return_level(return_periods, best_ksi, best_sigma),
+    "-", label=f"Least squares ($H_s={least_squares_at_TR:.3f}$ m at $T={T_R:.1f}$ years)",)
+
+mom_line, = plt.plot(return_periods, return_level(return_periods, mom_ksi, mom_sigma),
+    "--", label=f"Method of moments ($H_s={mom_at_TR:.3f}$ m at $T={T_R:.1f}$ years)")
+
+# Plot the return levels for the required return period
+plt.plot(T_R, least_squares_at_TR, "o", color=least_squares_line.get_color(), 
+         markeredgecolor="black", label="_nolegend_")
+plt.plot( T_R, mom_at_TR, "o", color=mom_line.get_color(),
+    markeredgecolor="black", label="_nolegend_",)
+plt.axvline(T_R, color="k", linestyle=":", label=f"Required T = {T_R:.1f} years")
+plt.xlabel("Return period [years]")
+plt.ylabel(r"Estimated wave height $H_s$ [m]")
+plt.xscale("log")
+plt.grid()
+plt.legend()
+plt.tight_layout()
 plt.show()
 
 ########################################################################################
@@ -372,8 +331,11 @@ F_fitted = 1 - np.maximum(
 plt.figure(figsize=(9, 6))
 plt.plot(excesses + u, plotting_position, "k+",
          label="Observed storm peaks", markersize=8)
+
 plt.plot(x_curve + u, F_curve, "r-",
-         label=fr"GPD fit ($\xi$={best_ksi:.4f}, $\sigma$={best_sigma:.4f} m)")
+         label=fr"Least-squares fit ($\xi$={best_ksi:.4f}, $\sigma$={best_sigma:.4f} m)")
+plt.plot(x_curve + u, F_curve, "b-",
+         label=fr"Method of moments ($\xi$={mom_ksi:.4f}, $\sigma$={mom_sigma:.4f} m)")
 plt.xlabel(r"Significant wave height $H_s$ [m]")
 plt.ylabel(r"Non-exceedance probability $F(H_s)$")
 plt.title("Generalised Pareto Distribution: Fitted vs Observed")
@@ -388,9 +350,8 @@ print(f"Optimal ksi: {best_ksi:.5f}")
 print(f"Optimal sigma: {best_sigma:.5f} m")
 print(f"Average relative wave-height error: {smallest_error:.2%}")
 
-########################################################################################
-#--------------------------------- Cool ChatGPT diagnostics------------------------------
-########################################################################################
+
+
 
 
 
@@ -398,19 +359,76 @@ print(f"Average relative wave-height error: {smallest_error:.2%}")
 # 3. Relationship between the Hs and Tp
 # =================================================================
 
-"""
-Tp_est = 3.4 * np.sqrt(df_wave["Hs"])  # Empirical relationship between Hs and Tp
+valid_wave = (
+    np.isfinite(df_wave["Hs"])
+    & np.isfinite(df_wave["Tp"])
+    & (df_wave["Hs"] > 0)
+    & (df_wave["Tp"] > 0)
+)
+fit_wave = df_wave.loc[valid_wave & (df_wave["Hs"] >= 0.2)]
+
+def hs_tp_relationship(hs, alpha, beta):
+    return alpha * hs ** beta
+
+
+relationship_parameters, _ = curve_fit(
+    hs_tp_relationship,
+    fit_wave["Hs"],
+    fit_wave["Tp"],
+    p0=(3.4, 0.5),
+    bounds=([0, 0], [np.inf, np.inf]),
+    maxfev=10000,
+)
+alpha, beta = relationship_parameters
+
+hs_fit = np.linspace(
+    0,
+    3,
+    200,
+)
+tp_fit = alpha * hs_fit ** beta
 
 plt.figure(figsize=(10, 6))
-plt.scatter(df_wave["Hs"], df_wave["Tp"], color='b', label="Storm Peaks")
-plt.plot(df_wave["Hs"], Tp_est, color='r', label="Estimated Tp (3.4 * sqrt(Hs))")
+plt.scatter(
+    df_wave.loc[valid_wave & (df_wave["Hs"] < 0.2), "Hs"],
+    df_wave.loc[valid_wave & (df_wave["Hs"] < 0.2), "Tp"],
+    color="lightskyblue",
+    s=10,
+    alpha=0.5,
+    label=r"Excluded points ($H_s < 0.2$ m)",
+)
+plt.scatter(
+    fit_wave["Hs"],
+    fit_wave["Tp"],
+    color="b",
+    s=10,
+    alpha=0.35,
+    label=r"Fitting data ($H_s \geq 0.2$ m)",
+
+)
+plt.plot(
+    hs_fit,
+    tp_fit,
+    color="r",
+    label=fr"Fitted relationship: $T_p = {alpha:.2f}H_s^{{{beta:.2f}}}$",
+)
 plt.title("Relationship between Significant Wave Height (Hs) and Peak Wave Period (Tp)")
 plt.xlabel("Significant Wave Height (Hs) [m]")
 plt.ylabel("Peak Wave Period (Tp) [s]")
+plt.xlim(0, 3)
+plt.ylim(bottom=0)
 plt.grid()
 plt.legend()
-plt.show()"""
+plt.show()
+
+print(f"Fitted relationship from {len(fit_wave)} observations (Hs >= 0.3 m): "
+      f"Tp = {alpha:.4f} * Hs^{beta:.4f}")
+
+
+
 
 # =================================================================
 # 4. Estimate the design Hs and Tp
 # =================================================================
+x_TR = best_sigma/best_ksi * (1 - (peaks_per_year * T_R)** (-best_ksi)) + u
+print(f"Design Hs for T = {T_R:.2f} years: {x_TR:.3f} m")

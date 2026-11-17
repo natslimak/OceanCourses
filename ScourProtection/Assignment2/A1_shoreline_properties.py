@@ -33,13 +33,14 @@ for critical_Hs in np.arange(0.1, 100, 0.01):
 # Get the wave period for that critical Hs value
 critical_Tp = np.mean(Tp[Hs > critical_Hs])
 
+critical_Ts = 0.95 * critical_Tp  # 95% of the peak wave period
 
 # =================================================================
 # 1.2 Closure Depth
 # =================================================================
 
 # Hallermeiers formula for assessing closure depth
-d_l = 1.57 * critical_Hs * (critical_Tp / 10) ** (1/3)
+d_l = 1.57 * critical_Hs * (critical_Ts / 10) ** (1/3)
 
 
 # =================================================================
