@@ -338,7 +338,7 @@ plt.plot(x_curve + u, F_curve, "b-",
          label=fr"Method of moments ($\xi$={mom_ksi:.4f}, $\sigma$={mom_sigma:.4f} m)")
 plt.xlabel(r"Significant wave height $H_s$ [m]")
 plt.ylabel(r"Non-exceedance probability $F(H_s)$")
-plt.title("Generalised Pareto Distribution: Fitted vs Observed")
+plt.title("Generalized Pareto Distribution: Fitted vs Observed")
 plt.ylim(0, 1.02)
 plt.grid()
 plt.legend()
@@ -432,3 +432,5 @@ print(f"Fitted relationship from {len(fit_wave)} observations (Hs >= 0.3 m): "
 # =================================================================
 x_TR = best_sigma/best_ksi * (1 - (peaks_per_year * T_R)** (-best_ksi)) + u
 print(f"Design Hs for T = {T_R:.2f} years: {x_TR:.3f} m")
+tp_des = alpha * x_TR ** beta
+print(f"Design Tp for T = {T_R:.2f} years: {tp_des:.3f} s")
